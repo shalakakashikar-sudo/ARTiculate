@@ -230,7 +230,6 @@ const App: React.FC = () => {
               Credits to <span className="text-yellow-400">Shalaka Kashikar</span>
             </div>
             <div className="flex gap-6 text-slate-400 text-sm items-center">
-              <span className="italic">Connected to Cloud Archive</span>
               {!isAuthenticated && (
                 <button 
                   onClick={() => setShowLoginModal(true)}
