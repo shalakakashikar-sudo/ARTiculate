@@ -1,0 +1,5 @@
+{
+  "name": "ARTiculate",
+  "description": "A vibrant, daily comic strip viewer and archival tool. Perfect for comic artists to showcase their daily work without complex backends.",
+  "requestFramePermissions": []
+}

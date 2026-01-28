@@ -1,0 +1,58 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ARTiculate - Daily Comic Strip Gallery</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Bangers&family=Open+Sans:wght@400;600;800&display=swap');
+      
+      body {
+        font-family: 'Open Sans', sans-serif;
+        background-color: #f8fafc;
+      }
+      
+      .comic-title {
+        font-family: 'Bangers', cursive;
+        letter-spacing: 0.1em;
+      }
+
+      /* Half-tone background pattern */
+      .halftone-bg {
+        background-color: #ffffff;
+        background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
+        background-size: 20px 20px;
+      }
+
+      /* Prevent image downloading via basic measures */
+      .prevent-save {
+        pointer-events: none;
+        user-select: none;
+        -webkit-user-drag: none;
+      }
+
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .animate-fadeIn {
+        animation: fadeIn 0.4s ease-out forwards;
+      }
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "react-router-dom": "https://esm.sh/react-router-dom@^7.13.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "react": "https://esm.sh/react@^19.2.4"
+  }
+}
+</script>
+</head>
+<body class="halftone-bg text-slate-900">
+    <div id="root"></div>
+</body>
+</html>
