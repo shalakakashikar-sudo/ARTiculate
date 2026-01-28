@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { HashRouter, Routes, Route, Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { HashRouter, Routes, Route, Link, Navigate } from 'react-router-dom';
 import { ViewMode, ComicEntry, Folder } from './types';
 import { supabase, isSupabaseConfigured } from './lib/supabase';
 import Gallery from './components/Gallery';
@@ -11,13 +11,15 @@ const App: React.FC = () => {
   const [comics, setComics] = useState<ComicEntry[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.VIEWER);
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [session, setSession] = useState<any>(null);
+  
   const [showLoginModal, setShowLoginModal] = useState(false);
-  const [passcodeInput, setPasscodeInput] = useState('');
-  const [loginError, setLoginError] = useState(false);
+  const [emailInput, setEmailInput] = useState('');
+  const [passwordInput, setPasswordInput] = useState('');
+  
+  const [loginError, setLoginError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-
-  const ARTIST_KEY = "SKETCH2025";
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   const loadData = async () => {
     if (!isSupabaseConfigured) {
@@ -30,7 +32,7 @@ const App: React.FC = () => {
       const { data: foldersData, error: fError } = await supabase
         .from('folders')
         .select('*')
-        .order('datecreated', { ascending: true }); // Use lowercase
+        .order('datecreated', { ascending: true });
       
       if (fError) throw fError;
       setFolders(foldersData || []);
@@ -50,31 +52,48 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
-    const authStatus = sessionStorage.getItem('articulate_auth');
-    if (authStatus === 'true') {
-      setIsAuthenticated(true);
-    }
+    // Check current session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+    });
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (!session) setViewMode(ViewMode.VIEWER);
+    });
+
     loadData();
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (passcodeInput === ARTIST_KEY) {
-      setIsAuthenticated(true);
-      sessionStorage.setItem('articulate_auth', 'true');
-      setViewMode(ViewMode.ADMIN);
+    setLoginError(null);
+    setIsLoggingIn(true);
+
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: emailInput,
+        password: passwordInput,
+      });
+
+      if (error) throw error;
+
       setShowLoginModal(false);
-      setPasscodeInput('');
-      setLoginError(false);
-    } else {
-      setLoginError(true);
-      setTimeout(() => setLoginError(false), 500);
+      setEmailInput('');
+      setPasswordInput('');
+      setViewMode(ViewMode.ADMIN);
+    } catch (err: any) {
+      setLoginError(err.message || "Invalid credentials.");
+    } finally {
+      setIsLoggingIn(false);
     }
   };
 
-  const handleLogout = () => {
-    setIsAuthenticated(false);
-    sessionStorage.removeItem('articulate_auth');
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
     setViewMode(ViewMode.VIEWER);
   };
 
@@ -83,17 +102,13 @@ const App: React.FC = () => {
       <div className="min-h-screen flex items-center justify-center bg-slate-100 p-6">
         <div className="max-w-md w-full bg-white border-4 border-black p-8 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] text-center">
           <h1 className="comic-title text-4xl mb-4 text-red-600">ACTION REQUIRED!</h1>
-          <p className="font-bold mb-6">You need to connect your Supabase project keys in <code className="bg-slate-100 px-1">lib/supabase.ts</code> to start using the cloud archive.</p>
-          <button 
-            onClick={() => window.location.reload()} 
-            className="w-full bg-black text-white font-black py-3 uppercase border-2 border-black hover:bg-slate-800"
-          >
-            I've Added Them! Reload
-          </button>
+          <p className="font-bold mb-6">Supabase configuration missing in <code className="bg-slate-100 px-1">lib/supabase.ts</code>.</p>
         </div>
       </div>
     );
   }
+
+  const isAuthenticated = !!session;
 
   return (
     <HashRouter>
@@ -151,41 +166,57 @@ const App: React.FC = () => {
               )
             } />
             <Route path="/comic/:id" element={<ComicViewer comics={comics} />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>
 
         {showLoginModal && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
             <div className={`bg-white border-4 border-black p-8 shadow-[12px_12px_0px_0px_rgba(234,179,8,1)] max-w-md w-full transition-transform ${loginError ? 'animate-bounce' : ''}`}>
-              <h2 className="comic-title text-4xl mb-6 text-center">THE ATELIER ACCESS</h2>
-              <form onSubmit={handleLogin} className="space-y-6">
+              <h2 className="comic-title text-4xl mb-6 text-center">MASTER ARTIST LOGIN</h2>
+              <form onSubmit={handleLogin} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-black uppercase mb-2 tracking-widest text-slate-500">Secret sketchbook Passcode</label>
+                  <label className="block text-xs font-black uppercase mb-1 text-slate-500">Email Address</label>
                   <input 
-                    autoFocus
+                    type="email"
+                    value={emailInput}
+                    onChange={(e) => setEmailInput(e.target.value)}
+                    className="w-full border-4 border-black p-3 font-bold focus:ring-4 ring-yellow-400 outline-none"
+                    placeholder="artist@example.com"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-black uppercase mb-1 text-slate-500">Secret Password</label>
+                  <input 
                     type="password"
-                    value={passcodeInput}
-                    onChange={(e) => setPasscodeInput(e.target.value)}
-                    className="w-full border-4 border-black p-4 text-2xl font-black text-center focus:outline-none focus:ring-4 ring-yellow-400"
+                    value={passwordInput}
+                    onChange={(e) => setPasswordInput(e.target.value)}
+                    className="w-full border-4 border-black p-3 font-bold focus:ring-4 ring-yellow-400 outline-none"
                     placeholder="••••••••"
+                    required
                   />
                 </div>
                 {loginError && (
-                  <p className="text-red-600 font-black text-center animate-pulse uppercase text-sm italic">"Wrong Key, Villain! Access Denied!"</p>
+                  <p className="text-red-600 font-black text-center text-xs uppercase animate-pulse">
+                    {loginError}
+                  </p>
                 )}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-4 mt-6">
                   <button 
+                    disabled={isLoggingIn}
                     type="button" 
-                    onClick={() => { setShowLoginModal(false); setLoginError(false); }}
-                    className="border-4 border-black font-black py-3 uppercase tracking-widest hover:bg-slate-100"
+                    onClick={() => { setShowLoginModal(false); setLoginError(null); }}
+                    className="border-4 border-black font-black py-3 uppercase tracking-widest hover:bg-slate-100 disabled:opacity-50"
                   >
                     Cancel
                   </button>
                   <button 
+                    disabled={isLoggingIn}
                     type="submit" 
-                    className="bg-black text-white border-4 border-black font-black py-3 uppercase tracking-widest hover:bg-slate-800 shadow-[4px_4px_0px_0px_rgba(234,179,8,1)]"
+                    className="bg-black text-white border-4 border-black font-black py-3 uppercase tracking-widest hover:bg-slate-800 shadow-[4px_4px_0px_0px_rgba(234,179,8,1)] disabled:opacity-50"
                   >
-                    Unlock
+                    {isLoggingIn ? 'Verifying...' : 'Unlock'}
                   </button>
                 </div>
               </form>
