@@ -157,6 +157,7 @@ const App: React.FC = () => {
                   ? <AdminPortal 
                       comics={comics} 
                       folders={folders}
+                      session={session}
                       onAdd={(c) => setComics(prev => [c, ...prev])} 
                       onDelete={(id) => setComics(prev => prev.filter(c => c.id !== id))} 
                       onAddFolder={(f) => setFolders(prev => [...prev, f])}
