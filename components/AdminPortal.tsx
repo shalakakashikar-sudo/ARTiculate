@@ -472,7 +472,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({
                       </span>
                     </div>
                     <button 
-                      onClick={() => { if(confirm(`Delete Series "${folder.name}"? This will only work if it is empty.`)) onDeleteFolder(folder.id); }}
+                      onClick={() => { if(confirm(`Delete Series "${folder.name}" and ALL its comics?`)) onDeleteFolder(folder.id); }}
                       className="text-[8px] font-black text-red-600 uppercase hover:underline opacity-0 group-hover:opacity-100 transition-opacity"
                     >
                       Delete

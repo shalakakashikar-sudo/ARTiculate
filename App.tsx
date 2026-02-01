@@ -95,7 +95,6 @@ const App: React.FC = () => {
     setViewMode(ViewMode.VIEWER);
   };
 
-  // PERSISTENT DELETE HANDLERS
   const handleDeleteComic = async (id: string) => {
     if (!isSupabaseConfigured) return;
     
@@ -103,36 +102,43 @@ const App: React.FC = () => {
     if (!comicToDelete) return;
 
     try {
-      // 1. Delete from Database
+      // Step 1: Delete database entry
       const { error: dbError } = await supabase.from('comics').delete().eq('id', id);
-      if (dbError) throw dbError;
+      
+      if (dbError) {
+        throw new Error(`Database error: ${dbError.message} (Code: ${dbError.code}). This is usually an RLS policy issue.`);
+      }
 
-      // 2. Try to Delete from Storage (Cleanup)
+      // Step 2: Delete storage file (optional, won't block the UI if it fails)
       if (comicToDelete.imageurl) {
-        // Extract filename from the public URL
         const urlParts = comicToDelete.imageurl.split('/');
         const fileName = urlParts[urlParts.length - 1];
         if (fileName) {
-          await supabase.storage.from('comics').remove([fileName]);
+          const { error: storageError } = await supabase.storage.from('comics').remove([fileName]);
+          if (storageError) console.warn("Storage cleanup failed:", storageError.message);
         }
       }
 
       setComics(prev => prev.filter(c => c.id !== id));
     } catch (err: any) {
       console.error("Delete Comic Error:", err);
-      alert(`Delete failed: ${err.message}. Check your Supabase RLS policies!`);
+      alert(`DELETE FAILED\n\n${err.message}`);
     }
   };
 
   const handleDeleteFolder = async (id: string) => {
     if (!isSupabaseConfigured) return;
     try {
+      // With ON DELETE CASCADE, this will also remove related comics from the DB
       const { error } = await supabase.from('folders').delete().eq('id', id);
       if (error) throw error;
+      
+      // Update local state for both folders and comics
       setFolders(prev => prev.filter(f => f.id !== id));
+      setComics(prev => prev.filter(c => c.folderid !== id));
     } catch (err: any) {
       console.error("Delete Folder Error:", err);
-      alert("Could not delete series. Ensure it is empty and you have DELETE permissions in Supabase.");
+      alert(`Could not delete series: ${err.message}`);
     }
   };
 
@@ -144,29 +150,47 @@ const App: React.FC = () => {
         <header className="sticky top-0 z-50 bg-yellow-400 border-b-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
           <div className="max-w-7xl mx-auto px-4 h-20 flex items-center justify-between">
             <Link to="/" className="flex items-center gap-3" onClick={() => setViewMode(ViewMode.VIEWER)}>
-              <div className="bg-white border-2 border-black p-1 rotate-[-2deg] shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+              <div className="bg-white border-2 border-black p-1 rotate-[-2deg] shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:rotate-0 transition-transform">
                 <span className="comic-title text-3xl font-black text-black px-2">ART<span className="text-red-600">iculate</span></span>
               </div>
             </Link>
 
-            <nav className="flex gap-4">
-              <Link to="/" onClick={() => setViewMode(ViewMode.VIEWER)} className="text-sm font-bold bg-white border-2 border-black px-4 py-2 hover:bg-black hover:text-white transition-colors uppercase tracking-tight">Gallery</Link>
+            <nav className="flex items-center gap-2 md:gap-4">
+              <Link 
+                to="/" 
+                onClick={() => setViewMode(ViewMode.VIEWER)} 
+                className={`text-[10px] md:text-sm font-bold border-2 border-black px-4 py-2 transition-colors uppercase tracking-tight ${
+                  viewMode === ViewMode.VIEWER ? 'bg-black text-white' : 'bg-white text-black hover:bg-slate-50'
+                }`}
+              >
+                Gallery
+              </Link>
               
               {isAuthenticated ? (
-                <div className="flex gap-2">
+                <>
                   <button 
                     onClick={() => setViewMode(prev => prev === ViewMode.ADMIN ? ViewMode.VIEWER : ViewMode.ADMIN)}
-                    className={`text-sm font-bold border-2 border-black px-4 py-2 transition-colors uppercase tracking-tight ${
-                      viewMode === ViewMode.ADMIN ? 'bg-blue-500 text-white' : 'bg-black text-white'
+                    className={`text-[10px] md:text-sm font-bold border-2 border-black px-4 py-2 transition-colors uppercase tracking-tight ${
+                      viewMode === ViewMode.ADMIN ? 'bg-blue-600 text-white shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]' : 'bg-white text-black hover:bg-slate-50'
                     }`}
                   >
-                    {viewMode === ViewMode.ADMIN ? 'View Gallery' : 'The Atelier'}
+                    {viewMode === ViewMode.ADMIN ? 'Previewing' : 'The Atelier'}
                   </button>
-                  <button onClick={handleLogout} className="text-sm font-bold border-2 border-black bg-white px-4 py-2 hover:bg-red-500 hover:text-white transition-colors uppercase tracking-tight">
+                  <button 
+                    onClick={handleLogout} 
+                    className="text-[10px] md:text-sm font-bold border-2 border-black bg-white px-4 py-2 hover:bg-red-500 hover:text-white transition-colors uppercase tracking-tight"
+                  >
                     Logout
                   </button>
-                </div>
-              ) : null}
+                </>
+              ) : (
+                <button 
+                  onClick={() => setShowLoginModal(true)}
+                  className="text-[10px] md:text-sm font-bold bg-black text-white border-2 border-black px-4 py-2 hover:bg-slate-800 transition-colors uppercase tracking-tight shadow-[3px_3px_0px_0px_rgba(239,68,68,1)] active:shadow-none active:translate-x-0.5 active:translate-y-0.5"
+                >
+                  Enter Atelier
+                </button>
+              )}
             </nav>
           </div>
         </header>
@@ -200,8 +224,64 @@ const App: React.FC = () => {
           </Routes>
         </main>
 
+        {showLoginModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+            <div className={`bg-white border-4 border-black p-8 shadow-[12px_12px_0px_0px_rgba(234,179,8,1)] max-w-md w-full transition-transform ${loginError ? 'animate-shake' : 'animate-fadeIn'}`}>
+              <h2 className="comic-title text-4xl mb-6 text-center">MASTER ARTIST LOGIN</h2>
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-black uppercase mb-1 text-slate-500 tracking-widest">Email Address</label>
+                  <input 
+                    type="email"
+                    value={emailInput}
+                    onChange={(e) => setEmailInput(e.target.value)}
+                    className="w-full border-4 border-black p-3 font-bold focus:ring-4 ring-yellow-400 outline-none transition-all"
+                    placeholder="artist@example.com"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-black uppercase mb-1 text-slate-500 tracking-widest">Secret Password</label>
+                  <input 
+                    type="password"
+                    value={passwordInput}
+                    onChange={(e) => setPasswordInput(e.target.value)}
+                    className="w-full border-4 border-black p-3 font-bold focus:ring-4 ring-yellow-400 outline-none transition-all"
+                    placeholder="••••••••"
+                    required
+                  />
+                </div>
+                {loginError && (
+                  <div className="bg-red-50 border-2 border-red-600 p-2 text-center">
+                    <p className="text-red-600 font-black text-[10px] uppercase">
+                      {loginError}
+                    </p>
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-4 mt-6">
+                  <button 
+                    disabled={isLoggingIn}
+                    type="button" 
+                    onClick={() => { setShowLoginModal(false); setLoginError(null); }}
+                    className="border-4 border-black font-black py-3 uppercase tracking-widest hover:bg-slate-100 disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    disabled={isLoggingIn}
+                    type="submit" 
+                    className="bg-black text-white border-4 border-black font-black py-3 uppercase tracking-widest hover:bg-slate-800 shadow-[4px_4px_0px_0px_rgba(234,179,8,1)] disabled:opacity-50 active:shadow-none active:translate-x-1 active:translate-y-1"
+                  >
+                    {isLoggingIn ? 'Unlocking...' : 'Unlock'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
         <footer className="bg-black text-white p-8 mt-12">
-          <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
+          <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6 text-center md:text-left">
             <div className="flex flex-col items-center md:items-start">
               <div className="text-slate-400 font-bold uppercase tracking-widest text-[10px] mb-1">
                 A CREATIVE GALLERY TOOL FOR ARTISTS
@@ -211,16 +291,19 @@ const App: React.FC = () => {
               </div>
             </div>
             
-            <div className="flex gap-6 text-slate-400 text-sm items-center">
+            <div className="flex flex-col items-center md:items-end gap-2 text-slate-400 text-sm">
+              <div className="flex gap-4">
+                <span className="text-[10px] font-black uppercase tracking-widest">Supabase Storage Active</span>
+                <span className="text-[10px] font-black uppercase tracking-widest">© {new Date().getFullYear()}</span>
+              </div>
               {!isAuthenticated && (
                 <button 
                   onClick={() => setShowLoginModal(true)}
-                  className="text-[10px] font-black border border-slate-600 px-2 py-1 hover:border-white hover:text-white transition-colors uppercase"
+                  className="text-[8px] font-black border border-slate-600 px-2 py-1 hover:border-white hover:text-white transition-colors uppercase mt-2 opacity-40 hover:opacity-100"
                 >
-                  Enter The Atelier
+                  Admin Portal Entry
                 </button>
               )}
-              <span className="text-[10px] opacity-30 font-black uppercase tracking-tighter">© {new Date().getFullYear()}</span>
             </div>
           </div>
         </footer>
