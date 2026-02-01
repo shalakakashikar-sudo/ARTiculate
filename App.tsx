@@ -103,30 +103,32 @@ const App: React.FC = () => {
 
     try {
       // 1. Delete DB record
+      // We don't check data length because RLS might prevent selecting the deleted row
       const { error: dbError } = await supabase
         .from('comics')
         .delete()
         .eq('id', id);
       
       if (dbError) {
-        throw new Error(`Permission Denied: ${dbError.message}`);
+        throw new Error(`Database Error: ${dbError.message}`);
       }
 
-      // 2. Clean up storage (optional/non-blocking)
-      if (comicToDelete.imageurl) {
+      // 2. Clean up storage (non-blocking)
+      // Extract filename from the public URL if it's a Supabase hosted image
+      if (comicToDelete.imageurl && comicToDelete.imageurl.includes('supabase.co')) {
         const urlParts = comicToDelete.imageurl.split('/');
         const fileName = urlParts[urlParts.length - 1];
-        if (fileName && !fileName.includes('http')) {
+        if (fileName) {
           await supabase.storage.from('comics').remove([fileName]);
         }
       }
 
-      // 3. Update local state immediately
+      // 3. Update local state
       setComics(prev => prev.filter(c => c.id !== id));
-      console.log(`Comic ${id} removed.`);
+      console.log(`Comic ${id} deleted.`);
     } catch (err: any) {
       console.error("Delete Failed:", err);
-      alert(`DELETE FAILED: ${err.message}`);
+      alert(`COULD NOT DELETE\n${err.message}`);
     }
   };
 
@@ -140,7 +142,7 @@ const App: React.FC = () => {
       
       if (error) throw error;
       
-      // Cascade delete handles comics in DB; we update state here
+      // Update state
       setFolders(prev => prev.filter(f => f.id !== id));
       setComics(prev => prev.filter(c => c.folderid !== id));
       console.log(`Series ${id} and its contents removed.`);
