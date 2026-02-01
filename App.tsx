@@ -95,6 +95,47 @@ const App: React.FC = () => {
     setViewMode(ViewMode.VIEWER);
   };
 
+  // PERSISTENT DELETE HANDLERS
+  const handleDeleteComic = async (id: string) => {
+    if (!isSupabaseConfigured) return;
+    
+    const comicToDelete = comics.find(c => c.id === id);
+    if (!comicToDelete) return;
+
+    try {
+      // 1. Delete from Database
+      const { error: dbError } = await supabase.from('comics').delete().eq('id', id);
+      if (dbError) throw dbError;
+
+      // 2. Try to Delete from Storage (Cleanup)
+      if (comicToDelete.imageurl) {
+        // Extract filename from the public URL
+        const urlParts = comicToDelete.imageurl.split('/');
+        const fileName = urlParts[urlParts.length - 1];
+        if (fileName) {
+          await supabase.storage.from('comics').remove([fileName]);
+        }
+      }
+
+      setComics(prev => prev.filter(c => c.id !== id));
+    } catch (err: any) {
+      console.error("Delete Comic Error:", err);
+      alert(`Delete failed: ${err.message}. Check your Supabase RLS policies!`);
+    }
+  };
+
+  const handleDeleteFolder = async (id: string) => {
+    if (!isSupabaseConfigured) return;
+    try {
+      const { error } = await supabase.from('folders').delete().eq('id', id);
+      if (error) throw error;
+      setFolders(prev => prev.filter(f => f.id !== id));
+    } catch (err: any) {
+      console.error("Delete Folder Error:", err);
+      alert("Could not delete series. Ensure it is empty and you have DELETE permissions in Supabase.");
+    }
+  };
+
   const isAuthenticated = !!session;
 
   return (
@@ -147,9 +188,9 @@ const App: React.FC = () => {
                       session={session}
                       onAdd={(c) => setComics(prev => [c, ...prev])} 
                       onUpdate={(c) => setComics(prev => prev.map(item => item.id === c.id ? c : item))}
-                      onDelete={(id) => setComics(prev => prev.filter(c => c.id !== id))} 
+                      onDelete={handleDeleteComic} 
                       onAddFolder={(f) => setFolders(prev => [...prev, f])}
-                      onDeleteFolder={(id) => setFolders(prev => prev.filter(f => f.id !== id))}
+                      onDeleteFolder={handleDeleteFolder}
                     />
                   : <Gallery comics={comics} folders={folders} />
               )
@@ -158,60 +199,6 @@ const App: React.FC = () => {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>
-
-        {showLoginModal && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-            <div className={`bg-white border-4 border-black p-8 shadow-[12px_12px_0px_0px_rgba(234,179,8,1)] max-w-md w-full transition-transform ${loginError ? 'animate-bounce' : ''}`}>
-              <h2 className="comic-title text-4xl mb-6 text-center">MASTER ARTIST LOGIN</h2>
-              <form onSubmit={handleLogin} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-black uppercase mb-1 text-slate-500">Email Address</label>
-                  <input 
-                    type="email"
-                    value={emailInput}
-                    onChange={(e) => setEmailInput(e.target.value)}
-                    className="w-full border-4 border-black p-3 font-bold focus:ring-4 ring-yellow-400 outline-none"
-                    placeholder="artist@example.com"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-black uppercase mb-1 text-slate-500">Secret Password</label>
-                  <input 
-                    type="password"
-                    value={passwordInput}
-                    onChange={(e) => setPasswordInput(e.target.value)}
-                    className="w-full border-4 border-black p-3 font-bold focus:ring-4 ring-yellow-400 outline-none"
-                    placeholder="••••••••"
-                    required
-                  />
-                </div>
-                {loginError && (
-                  <p className="text-red-600 font-black text-center text-xs uppercase animate-pulse">
-                    {loginError}
-                  </p>
-                )}
-                <div className="grid grid-cols-2 gap-4 mt-6">
-                  <button 
-                    disabled={isLoggingIn}
-                    type="button" 
-                    onClick={() => { setShowLoginModal(false); setLoginError(null); }}
-                    className="border-4 border-black font-black py-3 uppercase tracking-widest hover:bg-slate-100 disabled:opacity-50"
-                  >
-                    Cancel
-                  </button>
-                  <button 
-                    disabled={isLoggingIn}
-                    type="submit" 
-                    className="bg-black text-white border-4 border-black font-black py-3 uppercase tracking-widest hover:bg-slate-800 shadow-[4px_4px_0px_0px_rgba(234,179,8,1)] disabled:opacity-50"
-                  >
-                    {isLoggingIn ? 'Verifying...' : 'Unlock'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
 
         <footer className="bg-black text-white p-8 mt-12">
           <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">

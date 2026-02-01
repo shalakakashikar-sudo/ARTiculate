@@ -127,6 +127,8 @@ const AdminPortal: React.FC<AdminPortalProps> = ({
         if (fError) throw fError;
         onAddFolder(folderData);
         finalFolderId = folderData.id;
+        setIsCreatingNewFolder(false);
+        setNewFolderName('');
       }
 
       let imageUrl = previewUrl || '';
@@ -283,6 +285,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({
                 ) : (
                   <div className="animate-pulse space-y-4">
                      <h2 className="comic-title text-3xl uppercase">{publishStep.replace('-', ' ')}...</h2>
+                     {errorMessage && <p className="text-red-600 font-black uppercase text-xs">{errorMessage}</p>}
                   </div>
                 )}
               </div>
@@ -418,7 +421,9 @@ const AdminPortal: React.FC<AdminPortalProps> = ({
 
         {/* Archives Sidebar */}
         <aside className="lg:w-80 space-y-6 flex-shrink-0">
-          <div className="bg-white border-2 border-black p-5 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] flex flex-col h-[700px]">
+          
+          {/* Comics Feed Log */}
+          <div className="bg-white border-2 border-black p-5 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] flex flex-col h-[400px]">
             <h2 className="comic-title text-2xl border-b-2 border-black pb-2 mb-4">Feed Log</h2>
             
             <input 
@@ -443,13 +448,41 @@ const AdminPortal: React.FC<AdminPortalProps> = ({
                     <h4 className="font-black text-[9px] uppercase truncate leading-tight">{comic.title}</h4>
                     <div className="flex gap-2 mt-1">
                       <button onClick={() => startEditing(comic)} className="text-[8px] font-black text-blue-600 uppercase hover:underline">Edit</button>
-                      <button onClick={() => { if(confirm('Delete?')) onDelete(comic.id); }} className="text-[8px] font-black text-red-600 uppercase hover:underline">Delete</button>
+                      <button onClick={() => { if(confirm('Delete permanently?')) onDelete(comic.id); }} className="text-[8px] font-black text-red-600 uppercase hover:underline">Delete</button>
                     </div>
                   </div>
                 </div>
               ))}
             </div>
           </div>
+
+          {/* Folders/Series Management */}
+          <div className="bg-white border-2 border-black p-5 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] flex flex-col h-[280px]">
+            <h2 className="comic-title text-2xl border-b-2 border-black pb-2 mb-4">Series List</h2>
+            <div className="flex-grow space-y-2 overflow-y-auto pr-2 custom-scrollbar">
+              {folders.length === 0 ? (
+                <p className="text-[8px] uppercase font-black opacity-20 text-center py-10">No collections yet</p>
+              ) : (
+                folders.map(folder => (
+                  <div key={folder.id} className="p-3 border-2 border-black bg-slate-50 flex justify-between items-center group">
+                    <div className="min-w-0">
+                      <span className="font-black text-[10px] uppercase truncate block">{folder.name}</span>
+                      <span className="text-[7px] text-slate-400 font-bold uppercase">
+                        {comics.filter(c => c.folderid === folder.id).length} Entries
+                      </span>
+                    </div>
+                    <button 
+                      onClick={() => { if(confirm(`Delete Series "${folder.name}"? This will only work if it is empty.`)) onDeleteFolder(folder.id); }}
+                      className="text-[8px] font-black text-red-600 uppercase hover:underline opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
         </aside>
 
       </div>
