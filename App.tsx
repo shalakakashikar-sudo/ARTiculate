@@ -214,10 +214,16 @@ const App: React.FC = () => {
         )}
 
         <footer className="bg-black text-white p-8 mt-12">
-          <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
-            <div className="text-slate-400 font-bold uppercase tracking-widest text-sm text-center">
-              A CREATIVE GALLERY TOOL FOR ARTISTS
+          <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
+            <div className="flex flex-col items-center md:items-start">
+              <div className="text-slate-400 font-bold uppercase tracking-widest text-[10px] mb-1">
+                A CREATIVE GALLERY TOOL FOR ARTISTS
+              </div>
+              <div className="marker-font text-yellow-400 text-xl tracking-wider">
+                CREATED BY <span className="text-white border-b-2 border-red-600">SHALAKA KASHIKAR</span>
+              </div>
             </div>
+            
             <div className="flex gap-6 text-slate-400 text-sm items-center">
               {!isAuthenticated && (
                 <button 
@@ -227,6 +233,7 @@ const App: React.FC = () => {
                   Enter The Atelier
                 </button>
               )}
+              <span className="text-[10px] opacity-30 font-black uppercase tracking-tighter">© {new Date().getFullYear()}</span>
             </div>
           </div>
         </footer>
