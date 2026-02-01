@@ -7,22 +7,60 @@
     <title>ARTiculate - Daily Comic Strip Gallery</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-      @import url('https://fonts.googleapis.com/css2?family=Bangers&family=Open+Sans:wght@400;600;800&display=swap');
+      @import url('https://fonts.googleapis.com/css2?family=Bangers&family=Open+Sans:wght@400;600;800&family=Permanent+Marker&display=swap');
       
+      :root {
+        --comic-yellow: #fbbf24;
+        --comic-red: #ef4444;
+        --comic-blue: #3b82f6;
+      }
+
       body {
         font-family: 'Open Sans', sans-serif;
-        background-color: #f8fafc;
+        background-color: #f1f5f9;
+        background-image: 
+          radial-gradient(#cbd5e1 1px, transparent 1px),
+          linear-gradient(to right, #e2e8f0 1px, transparent 1px),
+          linear-gradient(to bottom, #e2e8f0 1px, transparent 1px);
+        background-size: 20px 20px, 100px 100px, 100px 100px;
       }
       
       .comic-title {
         font-family: 'Bangers', cursive;
-        letter-spacing: 0.1em;
+        letter-spacing: 0.05em;
       }
 
-      .halftone-bg {
-        background-color: #ffffff;
-        background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
-        background-size: 20px 20px;
+      .marker-font {
+        font-family: 'Permanent Marker', cursive;
+      }
+
+      /* Advanced Comic Shadow */
+      .pop-shadow {
+        box-shadow: 4px 4px 0px 0px rgba(0,0,0,1);
+      }
+      
+      .pop-shadow-lg {
+        box-shadow: 8px 8px 0px 0px rgba(0,0,0,1);
+      }
+
+      .pop-shadow-hover:hover {
+        box-shadow: 2px 2px 0px 0px rgba(0,0,0,1);
+        transform: translate(2px, 2px);
+      }
+
+      /* Halftone Pattern Overlay */
+      .halftone-overlay::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background-image: radial-gradient(rgba(0,0,0,0.1) 1px, transparent 0);
+        background-size: 4px 4px;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        pointer-events: none;
+      }
+      .group:hover .halftone-overlay::after {
+        opacity: 1;
       }
 
       .prevent-save {
@@ -32,31 +70,39 @@
       }
 
       @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(10px); }
+        from { opacity: 0; transform: translateY(15px); }
         to { opacity: 1; transform: translateY(0); }
       }
       .animate-fadeIn {
-        animation: fadeIn 0.4s ease-out forwards;
+        animation: fadeIn 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
       }
 
       @keyframes shake {
         0%, 100% { transform: translateX(0); }
-        25% { transform: translateX(-5px); }
-        75% { transform: translateX(5px); }
+        25% { transform: translateX(-4px); }
+        75% { transform: translateX(4px); }
       }
       .animate-shake {
         animation: shake 0.2s ease-in-out 0s 2;
       }
 
       .custom-scrollbar::-webkit-scrollbar {
-        width: 8px;
+        width: 10px;
       }
       .custom-scrollbar::-webkit-scrollbar-track {
         background: #f1f1f1;
+        border-left: 2px solid #000;
       }
       .custom-scrollbar::-webkit-scrollbar-thumb {
         background: #000;
-        border: 2px solid #f1f1f1;
+      }
+
+      /* Tilt effect */
+      .tilt-sm { transform: rotate(-1deg); }
+      .tilt-xs { transform: rotate(0.5deg); }
+      
+      .panel-clip {
+        clip-path: polygon(0% 0%, 100% 0%, 98% 100%, 2% 98%);
       }
     </style>
 <script type="importmap">
@@ -73,7 +119,7 @@
 }
 </script>
 </head>
-<body class="halftone-bg text-slate-900">
+<body class="text-slate-900 overflow-x-hidden custom-scrollbar">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
 </body>

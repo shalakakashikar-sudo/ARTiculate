@@ -52,12 +52,10 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
-    // Check current session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
     });
 
-    // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       if (!session) setViewMode(ViewMode.VIEWER);
@@ -96,17 +94,6 @@ const App: React.FC = () => {
     await supabase.auth.signOut();
     setViewMode(ViewMode.VIEWER);
   };
-
-  if (!isSupabaseConfigured) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-100 p-6">
-        <div className="max-w-md w-full bg-white border-4 border-black p-8 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] text-center">
-          <h1 className="comic-title text-4xl mb-4 text-red-600">ACTION REQUIRED!</h1>
-          <p className="font-bold mb-6">Supabase configuration missing in <code className="bg-slate-100 px-1">lib/supabase.ts</code>.</p>
-        </div>
-      </div>
-    );
-  }
 
   const isAuthenticated = !!session;
 
@@ -159,6 +146,7 @@ const App: React.FC = () => {
                       folders={folders}
                       session={session}
                       onAdd={(c) => setComics(prev => [c, ...prev])} 
+                      onUpdate={(c) => setComics(prev => prev.map(item => item.id === c.id ? c : item))}
                       onDelete={(id) => setComics(prev => prev.filter(c => c.id !== id))} 
                       onAddFolder={(f) => setFolders(prev => [...prev, f])}
                       onDeleteFolder={(id) => setFolders(prev => prev.filter(f => f.id !== id))}
@@ -227,8 +215,8 @@ const App: React.FC = () => {
 
         <footer className="bg-black text-white p-8 mt-12">
           <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
-            <div className="text-slate-400 font-bold uppercase tracking-widest text-sm">
-              Credits to <span className="text-yellow-400">Shalaka Kashikar</span>
+            <div className="text-slate-400 font-bold uppercase tracking-widest text-sm text-center">
+              A CREATIVE GALLERY TOOL FOR ARTISTS
             </div>
             <div className="flex gap-6 text-slate-400 text-sm items-center">
               {!isAuthenticated && (

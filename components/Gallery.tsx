@@ -8,67 +8,52 @@ interface GalleryProps {
   folders: Folder[];
 }
 
-const GalleryCard: React.FC<{ comic: ComicEntry; isHero?: boolean }> = ({ comic, isHero }) => {
+const GalleryCard: React.FC<{ comic: ComicEntry }> = ({ comic }) => {
   const displayUrl = comic.thumbnailurl || (comic.mimetype.startsWith('image/') ? comic.imageurl : null);
-
-  const sizeClasses = isHero 
-    ? "md:col-span-full mb-8" 
-    : (comic.layoutsize === 'small' ? "md:col-span-1 md:row-span-1" : 
-       comic.layoutsize === 'large' ? "md:col-span-2 md:row-span-2" : 
-       "md:col-span-1 md:row-span-2");
 
   return (
     <Link 
       to={`/comic/${comic.id}`}
-      className={`group block bg-white border-4 border-black p-3 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:translate-x-1 hover:translate-y-1 hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all ${sizeClasses}`}
+      className="group block bg-white border-2 border-black p-1 transition-all duration-300 hover:-translate-y-1 hover:shadow-[6px_6px_0px_0px_rgba(250,204,21,1)]"
+      title={comic.title}
     >
-      <div className={`relative h-full flex ${isHero ? 'flex-col md:flex-row gap-6' : 'flex-col'}`}>
-        <div className={`relative overflow-hidden border-2 border-black bg-slate-50 flex items-center justify-center ${isHero ? 'w-full md:w-2/3 h-[300px] md:h-[450px]' : 'flex-grow min-h-[150px] mb-3'}`}>
+      <div className="relative flex flex-col h-full overflow-hidden">
+        {/* The Frame - aspect-square with object-contain for full visibility */}
+        <div className="relative aspect-square bg-slate-50 flex items-center justify-center p-1.5 overflow-hidden">
           {displayUrl ? (
             <img 
               src={displayUrl} 
               alt={comic.title} 
-              className="w-full h-full object-cover prevent-save"
+              className="max-w-full max-h-full object-contain prevent-save transition-transform duration-500 group-hover:scale-110"
               onContextMenu={(e) => e.preventDefault()}
             />
           ) : (
-            <div className="w-full h-full flex flex-col items-center justify-center text-center p-4 bg-slate-200">
-              <span className="font-black text-red-600 text-2xl">PDF VOLUME</span>
+            <div className="text-center opacity-20">
+              <span className="comic-title text-xl text-red-600 italic uppercase">Log</span>
             </div>
           )}
           
+          {/* Subtle PDF Badge */}
           {comic.mimetype === 'application/pdf' && (
-            <div className="absolute top-2 left-2 bg-red-600 border-2 border-black px-2 py-1 text-xs font-black uppercase text-white shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
-              PDF CHRONICLE
-            </div>
-          )}
-          {isHero && (
-            <div className="absolute top-2 right-2 bg-yellow-400 border-2 border-black px-3 py-1 font-black uppercase text-xs">
-              Latest Release
+            <div className="absolute top-1 right-1 bg-red-600 border border-black px-1.5 py-0.5 text-[8px] font-black text-white">
+              PDF
             </div>
           )}
         </div>
         
-        <div className={isHero ? 'w-full md:w-1/3 flex flex-col justify-center py-4' : 'mt-auto'}>
-          <h3 className={`comic-title mb-1 truncate ${isHero ? 'text-4xl md:text-5xl border-b-4 border-black pb-2' : 'text-xl'}`}>
+        {/* Minimalist Data Bar */}
+        <div className="bg-white pt-2 pb-1 px-1 border-t border-slate-100">
+          <h3 className="font-black text-[10px] uppercase truncate leading-none mb-1 group-hover:text-blue-600 transition-colors">
             {comic.title}
           </h3>
-          {isHero && <p className="text-slate-600 font-medium my-4 italic line-clamp-3">"{comic.description}"</p>}
-          <div className="flex justify-between items-center mt-2">
-            <span className="text-[10px] font-black text-black uppercase tracking-widest bg-yellow-400 px-2 py-0.5 border border-black">
-              {new Date(comic.date).toLocaleDateString()}
+          <div className="flex justify-between items-center opacity-60">
+            <span className="text-[8px] font-bold uppercase tracking-tighter">
+              {new Date(comic.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
             </span>
-            <div className="flex gap-1 overflow-hidden">
-               {comic.tags.slice(0, isHero ? 5 : 1).map(tag => (
-                 <span key={tag} className="text-[10px] border border-slate-300 px-1.5 py-0.5 font-bold text-slate-400 uppercase">#{tag}</span>
-               ))}
-            </div>
+            {comic.tags.length > 0 && (
+              <span className="text-[7px] font-black uppercase">#{comic.tags[0]}</span>
+            )}
           </div>
-          {isHero && (
-            <button className="mt-8 bg-black text-white font-black py-4 uppercase tracking-widest border-2 border-black hover:bg-slate-800 self-start px-8">
-              Read Entry →
-            </button>
-          )}
         </div>
       </div>
     </Link>
@@ -98,55 +83,68 @@ const Gallery: React.FC<GalleryProps> = ({ comics, folders }) => {
   }, [comics, activeFolderId, searchQuery, selectedTag]);
 
   const activeFolder = folders.find(f => f.id === activeFolderId);
-  const showHero = !searchQuery && !selectedTag && !activeFolderId && filteredComics.length > 0;
-  
-  const heroComic = showHero ? filteredComics[0] : null;
-  const gridComics = showHero ? filteredComics.slice(1) : filteredComics;
 
   return (
-    <div className="flex flex-col md:flex-row gap-8">
-      {/* Sidebar Navigation */}
-      <aside className="md:w-64 flex-shrink-0 space-y-8">
+    <div className="flex flex-col lg:flex-row gap-8 animate-fadeIn">
+      {/* Sidebar Navigation - Slim and Modern */}
+      <aside className="lg:w-64 flex-shrink-0 space-y-6">
+        
+        {/* Search */}
+        <div className="relative">
+          <input 
+            type="text" 
+            placeholder="FIND RECORD..." 
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-white border-2 border-black p-3 text-[10px] font-black uppercase italic focus:outline-none ring-2 ring-transparent focus:ring-yellow-400 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all"
+          />
+        </div>
+
         {/* Collections */}
-        <div className="bg-white border-4 border-black p-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-          <h2 className="comic-title text-2xl mb-4 border-b-2 border-black pb-2">Series</h2>
-          <ul className="space-y-2">
+        <div className="bg-white border-2 border-black p-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+          <h2 className="comic-title text-xl mb-3 border-b-2 border-black pb-1 uppercase">Archives</h2>
+          <ul className="space-y-1">
             <li>
               <button 
                 onClick={() => setActiveFolderId(null)}
-                className={`w-full text-left font-black uppercase text-xs p-2 border-2 transition-all ${!activeFolderId ? 'bg-black text-white border-black' : 'border-transparent hover:border-slate-200'}`}
+                className={`w-full text-left font-black uppercase text-[10px] px-2 py-2 border transition-all flex items-center justify-between ${!activeFolderId ? 'bg-black text-white border-black' : 'bg-slate-50 border-transparent hover:border-black'}`}
               >
-                Entire Archive
+                <span>Full History</span>
+                <span className="opacity-40">{comics.length}</span>
               </button>
             </li>
-            {folders.map(f => (
-              <li key={f.id}>
-                <button 
-                  onClick={() => setActiveFolderId(f.id)}
-                  className={`w-full text-left font-black uppercase text-xs p-2 border-2 transition-all ${activeFolderId === f.id ? 'bg-blue-600 text-white border-black' : 'border-transparent hover:border-slate-200'}`}
-                >
-                  {f.name}
-                </button>
-              </li>
-            ))}
+            {folders.map(f => {
+              const count = comics.filter(c => c.folderid === f.id).length;
+              return (count > 0 || !activeFolderId) && (
+                <li key={f.id}>
+                  <button 
+                    onClick={() => setActiveFolderId(f.id)}
+                    className={`w-full text-left font-black uppercase text-[10px] px-2 py-2 border transition-all flex items-center justify-between ${activeFolderId === f.id ? 'bg-blue-600 text-white border-black' : 'bg-slate-50 border-transparent hover:border-black'}`}
+                  >
+                    <span className="truncate pr-2">{f.name}</span>
+                    <span className="opacity-40">{count}</span>
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         </div>
 
         {/* Tags */}
-        <div className="bg-white border-4 border-black p-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-          <h2 className="comic-title text-2xl mb-4 border-b-2 border-black pb-2">Tags</h2>
-          <div className="flex flex-wrap gap-2">
+        <div className="bg-yellow-400 border-2 border-black p-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+          <h2 className="comic-title text-xl mb-3 border-b-2 border-black pb-1 uppercase">Filter</h2>
+          <div className="flex flex-wrap gap-1.5">
             <button 
               onClick={() => setSelectedTag(null)}
-              className={`text-[10px] font-black uppercase px-2 py-1 border-2 transition-all ${!selectedTag ? 'bg-black text-white border-black' : 'bg-white border-slate-200 hover:border-black'}`}
+              className={`text-[9px] font-black uppercase px-2 py-1 border transition-all ${!selectedTag ? 'bg-black text-white border-black' : 'bg-white border-black hover:bg-slate-50'}`}
             >
-              All Tags
+              All
             </button>
             {allTags.map(tag => (
               <button 
                 key={tag}
                 onClick={() => setSelectedTag(tag)}
-                className={`text-[10px] font-black uppercase px-2 py-1 border-2 transition-all ${selectedTag === tag ? 'bg-yellow-400 border-black' : 'bg-white border-slate-200 hover:border-black'}`}
+                className={`text-[9px] font-black uppercase px-2 py-1 border transition-all ${selectedTag === tag ? 'bg-red-600 text-white border-black' : 'bg-white border-black hover:bg-slate-50'}`}
               >
                 #{tag}
               </button>
@@ -155,38 +153,36 @@ const Gallery: React.FC<GalleryProps> = ({ comics, folders }) => {
         </div>
       </aside>
 
-      {/* Main Content Area */}
+      {/* Main Grid Area - Tightly Calibrated Columns */}
       <div className="flex-grow">
-        {/* Search Bar */}
-        <div className="mb-8 relative group">
-          <input 
-            type="text" 
-            placeholder="Search for chronicles, heroes, or dates..." 
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-white border-4 border-black p-4 text-xl font-bold italic focus:outline-none focus:ring-4 ring-yellow-400 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]"
-          />
-          <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none opacity-50 group-focus-within:opacity-100">
-            <span className="font-black text-xs uppercase tracking-widest">Type to find...</span>
-          </div>
-        </div>
-
         {activeFolder && (
-          <div className="mb-8 border-l-8 border-yellow-400 pl-4 py-2">
-            <h1 className="comic-title text-5xl">{activeFolder.name}</h1>
-            <p className="text-slate-500 font-medium italic mt-1 text-lg">{activeFolder.description || "A curated series of chronicles."}</p>
+          <div className="mb-6 bg-white border-2 border-black p-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+            <h1 className="comic-title text-3xl text-blue-600 uppercase leading-none">{activeFolder.name}</h1>
+            <p className="marker-font text-xs text-slate-400 mt-2">{activeFolder.description || "Daily Chronicle Collection."}</p>
+          </div>
+        )}
+
+        {(searchQuery || selectedTag) && (
+          <div className="mb-4 flex items-center justify-between">
+             <div className="text-[10px] font-black uppercase tracking-widest italic">
+                Query: <span className="text-red-600 underline ml-2">{searchQuery || `#${selectedTag}`}</span>
+             </div>
+             <button 
+               onClick={() => {setSearchQuery(''); setSelectedTag(null);}}
+               className="text-[10px] font-black uppercase underline hover:text-red-600"
+             >
+               Clear
+             </button>
           </div>
         )}
 
         {filteredComics.length === 0 ? (
-          <div className="text-center py-20 bg-white border-4 border-black border-dashed">
-            <h2 className="text-2xl font-black text-slate-300 uppercase italic tracking-widest">No matching chronicles found...</h2>
-            <button onClick={() => {setSearchQuery(''); setSelectedTag(null); setActiveFolderId(null);}} className="mt-4 text-blue-600 underline font-bold">Clear all filters</button>
+          <div className="text-center py-32 bg-white border-2 border-black border-dashed opacity-30">
+            <h2 className="comic-title text-3xl uppercase">Void</h2>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6 auto-rows-[120px]">
-            {heroComic && <GalleryCard comic={heroComic} isHero={true} />}
-            {gridComics.map((comic) => (
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 2xl:grid-cols-8 gap-3 md:gap-4">
+            {filteredComics.map((comic) => (
               <GalleryCard key={comic.id} comic={comic} />
             ))}
           </div>
