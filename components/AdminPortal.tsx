@@ -106,27 +106,22 @@ const AdminPortal: React.FC<AdminPortalProps> = ({
 
     setPublishStep('uploading-file');
     const tempId = Date.now().toString();
-    const userId = session?.user?.id;
 
     try {
       let finalFolderId = selectedFolder;
 
+      // Create new folder if needed
       if (isCreatingNewFolder && newFolderName) {
-        const newFolderId = crypto.randomUUID();
         const { data: folderData, error: fError } = await supabase
           .from('folders')
-          .insert([{ 
-            id: newFolderId,
-            name: newFolderName, 
-            description: '', 
-            datecreated: new Date().toISOString(),
-            user_id: userId 
-          }])
-          .select()
-          .single();
+          .insert([{ name: newFolderName, description: '' }])
+          .select();
+        
         if (fError) throw fError;
-        onAddFolder(folderData);
-        finalFolderId = folderData.id;
+        if (folderData && folderData.length > 0) {
+          onAddFolder(folderData[0]);
+          finalFolderId = folderData[0].id;
+        }
         setIsCreatingNewFolder(false);
         setNewFolderName('');
       }
@@ -160,18 +155,18 @@ const AdminPortal: React.FC<AdminPortalProps> = ({
           .from('comics')
           .update(payload)
           .eq('id', editModeId)
-          .select()
-          .single();
+          .select();
+        
         if (dbError) throw dbError;
-        onUpdate(updated);
+        if (updated && updated.length > 0) onUpdate(updated[0]);
       } else {
         const { data: created, error: dbError } = await supabase
           .from('comics')
-          .insert([{ ...payload, id: crypto.randomUUID(), date: new Date().toISOString(), user_id: userId }])
-          .select()
-          .single();
+          .insert([payload])
+          .select();
+        
         if (dbError) throw dbError;
-        onAdd(created);
+        if (created && created.length > 0) onAdd(created[0]);
       }
 
       setPublishStep('success');
@@ -181,8 +176,10 @@ const AdminPortal: React.FC<AdminPortalProps> = ({
       }, 1500);
 
     } catch (err: any) {
+      console.error("Publish Error:", err);
       setPublishStep('error');
       setErrorMessage(err.message);
+      setTimeout(() => setPublishStep('idle'), 3000);
     }
   };
 
@@ -190,7 +187,6 @@ const AdminPortal: React.FC<AdminPortalProps> = ({
     if (bulkFiles.length === 0) return;
     setPublishStep('batch-processing');
     setBatchProgress({ current: 0, total: bulkFiles.length });
-    const userId = session?.user?.id;
 
     for (let i = 0; i < bulkFiles.length; i++) {
       const file = bulkFiles[i];
@@ -206,22 +202,18 @@ const AdminPortal: React.FC<AdminPortalProps> = ({
         
         const { data: { publicUrl } } = supabase.storage.from('comics').getPublicUrl(fileName);
         
-        const { data: comic, error: dbError } = await supabase
+        const { data: created, error: dbError } = await supabase
           .from('comics')
           .insert([{
-            id: crypto.randomUUID(),
             title: file.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " "),
-            date: new Date().toISOString(),
             imageurl: publicUrl,
             mimetype: file.type,
             tags: newTags.split(',').map(t => t.trim()).filter(t => t),
-            folderid: selectedFolder || null,
-            user_id: userId
+            folderid: selectedFolder || null
           }])
-          .select()
-          .single();
+          .select();
         
-        if (!dbError) onAdd(comic);
+        if (!dbError && created && created.length > 0) onAdd(created[0]);
       } catch (err) {
         console.error("Bulk upload item failed:", err);
       }
@@ -282,10 +274,17 @@ const AdminPortal: React.FC<AdminPortalProps> = ({
                     </div>
                     <p className="font-black text-[10px] uppercase italic">Finalizing {batchProgress.current} / {batchProgress.total}</p>
                   </div>
+                ) : publishStep === 'error' ? (
+                  <div className="space-y-4">
+                     <div className="w-16 h-16 bg-red-500 rounded-full flex items-center justify-center border-2 border-black mx-auto">
+                      <span className="text-white text-3xl">!</span>
+                    </div>
+                     <h2 className="comic-title text-3xl uppercase text-red-600">Error</h2>
+                     <p className="text-red-600 font-black uppercase text-xs">{errorMessage}</p>
+                  </div>
                 ) : (
                   <div className="animate-pulse space-y-4">
                      <h2 className="comic-title text-3xl uppercase">{publishStep.replace('-', ' ')}...</h2>
-                     {errorMessage && <p className="text-red-600 font-black uppercase text-xs">{errorMessage}</p>}
                   </div>
                 )}
               </div>
@@ -441,14 +440,14 @@ const AdminPortal: React.FC<AdminPortalProps> = ({
                     {comic.imageurl && comic.mimetype.startsWith('image/') ? (
                       <img src={comic.imageurl} className="w-full h-full object-cover" />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center font-black text-[8px] text-red-600">PDF</div>
+                      <div className="w-full h-full flex items-center justify-center font-black text-[8px] text-red-600">ART</div>
                     )}
                   </div>
                   <div className="min-w-0 flex-grow flex flex-col justify-center">
                     <h4 className="font-black text-[9px] uppercase truncate leading-tight">{comic.title}</h4>
                     <div className="flex gap-2 mt-1">
                       <button onClick={() => startEditing(comic)} className="text-[8px] font-black text-blue-600 uppercase hover:underline">Edit</button>
-                      <button onClick={() => { if(confirm('Delete permanently?')) onDelete(comic.id); }} className="text-[8px] font-black text-red-600 uppercase hover:underline">Delete</button>
+                      <button onClick={() => { if(confirm(`Permanently delete "${comic.title}"?`)) onDelete(comic.id); }} className="text-[8px] font-black text-red-600 uppercase hover:underline">Delete</button>
                     </div>
                   </div>
                 </div>

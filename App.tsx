@@ -102,43 +102,51 @@ const App: React.FC = () => {
     if (!comicToDelete) return;
 
     try {
-      // Step 1: Delete database entry
-      const { error: dbError } = await supabase.from('comics').delete().eq('id', id);
+      // 1. Delete DB record
+      const { error: dbError } = await supabase
+        .from('comics')
+        .delete()
+        .eq('id', id);
       
       if (dbError) {
-        throw new Error(`Database error: ${dbError.message} (Code: ${dbError.code}). This is usually an RLS policy issue.`);
+        throw new Error(`Permission Denied: ${dbError.message}`);
       }
 
-      // Step 2: Delete storage file (optional, won't block the UI if it fails)
+      // 2. Clean up storage (optional/non-blocking)
       if (comicToDelete.imageurl) {
         const urlParts = comicToDelete.imageurl.split('/');
         const fileName = urlParts[urlParts.length - 1];
-        if (fileName) {
-          const { error: storageError } = await supabase.storage.from('comics').remove([fileName]);
-          if (storageError) console.warn("Storage cleanup failed:", storageError.message);
+        if (fileName && !fileName.includes('http')) {
+          await supabase.storage.from('comics').remove([fileName]);
         }
       }
 
+      // 3. Update local state immediately
       setComics(prev => prev.filter(c => c.id !== id));
+      console.log(`Comic ${id} removed.`);
     } catch (err: any) {
-      console.error("Delete Comic Error:", err);
-      alert(`DELETE FAILED\n\n${err.message}`);
+      console.error("Delete Failed:", err);
+      alert(`DELETE FAILED: ${err.message}`);
     }
   };
 
   const handleDeleteFolder = async (id: string) => {
     if (!isSupabaseConfigured) return;
     try {
-      // With ON DELETE CASCADE, this will also remove related comics from the DB
-      const { error } = await supabase.from('folders').delete().eq('id', id);
+      const { error } = await supabase
+        .from('folders')
+        .delete()
+        .eq('id', id);
+      
       if (error) throw error;
       
-      // Update local state for both folders and comics
+      // Cascade delete handles comics in DB; we update state here
       setFolders(prev => prev.filter(f => f.id !== id));
       setComics(prev => prev.filter(c => c.folderid !== id));
+      console.log(`Series ${id} and its contents removed.`);
     } catch (err: any) {
-      console.error("Delete Folder Error:", err);
-      alert(`Could not delete series: ${err.message}`);
+      console.error("Series Deletion Failed:", err);
+      alert(`COULD NOT DELETE SERIES: ${err.message}`);
     }
   };
 
@@ -292,10 +300,6 @@ const App: React.FC = () => {
             </div>
             
             <div className="flex flex-col items-center md:items-end gap-2 text-slate-400 text-sm">
-              <div className="flex gap-4">
-                <span className="text-[10px] font-black uppercase tracking-widest">Supabase Storage Active</span>
-                <span className="text-[10px] font-black uppercase tracking-widest">© {new Date().getFullYear()}</span>
-              </div>
               {!isAuthenticated && (
                 <button 
                   onClick={() => setShowLoginModal(true)}
