@@ -29,8 +29,8 @@ const ComicViewer: React.FC<ComicViewerProps> = ({ comics }) => {
 
   /**
    * Ultra-High-Fidelity PDF Multi-Page Renderer
-   * Renders every page at 4.0x scale (High-DPI optimized)
-   * Uses a white-foundation pass and 'print' intent for maximum vibrancy.
+   * Renders every page at 4.0x scale (High-DPI optimized) for extreme clarity.
+   * Uses a white-foundation pass and 'print' intent for maximum color vibrancy.
    */
   const renderPdfChronicle = useCallback(async (url: string) => {
     const pdfjsLib = (window as any).pdfjsLib;
@@ -42,10 +42,9 @@ const ComicViewer: React.FC<ComicViewerProps> = ({ comics }) => {
       const pagesCount = pdf.numPages;
       const renderedPages: string[] = [];
 
-      // Loop through all pages to ensure the "Full Chronicle" is visible
       for (let i = 1; i <= pagesCount; i++) {
         const page = await pdf.getPage(i);
-        // Scale 4.0 provides exceptional detail for both text and ink lines
+        // Scale 4.0 provides exceptional detail for ink lines and colors
         const viewport = page.getViewport({ scale: 4.0 }); 
         const canvas = document.createElement('canvas');
         const context = canvas.getContext('2d', { 
@@ -57,17 +56,17 @@ const ComicViewer: React.FC<ComicViewerProps> = ({ comics }) => {
           canvas.height = viewport.height;
           canvas.width = viewport.width;
 
-          // COLOR FOUNDATION: Fill with pure white to ensure colors don't look muddy
+          // COLOR FOUNDATION: Pure white base ensures sRGB colors are vibrant
           context.fillStyle = '#FFFFFF';
           context.fillRect(0, 0, canvas.width, canvas.height);
 
           await page.render({ 
             canvasContext: context, 
             viewport: viewport,
-            intent: 'print' // 'print' intent often results in more accurate and vibrant color reproduction
+            intent: 'print' 
           }).promise;
           
-          // 0.98 quality provides near-lossless clarity and vibrancy
+          // 0.98 quality maintains vibrancy with near-lossless compression
           renderedPages.push(canvas.toDataURL('image/jpeg', 0.98));
         }
       }
@@ -84,16 +83,6 @@ const ComicViewer: React.FC<ComicViewerProps> = ({ comics }) => {
       renderPdfChronicle(comic.imageurl);
     }
   }, [comic, renderPdfChronicle]);
-
-  const openFullContent = () => {
-    if (!comic || !comic.imageurl) return;
-    const win = window.open(comic.imageurl, '_blank');
-    if (win) {
-      win.focus();
-    } else {
-      alert("Pop-up blocked! Please allow pop-ups to view the chronicle.");
-    }
-  };
 
   if (!comic) {
     return (
@@ -147,7 +136,7 @@ const ComicViewer: React.FC<ComicViewerProps> = ({ comics }) => {
                       <img 
                         src={pageUrl} 
                         alt={`${comic.title} - Page ${idx + 1}`} 
-                        className="w-full h-auto prevent-save block contrast-[1.04] brightness-[1.01]"
+                        className="w-full h-auto prevent-save block contrast-[1.05] brightness-[1.01]"
                         style={{ imageRendering: 'high-quality' }}
                         onContextMenu={(e) => e.preventDefault()}
                       />
@@ -164,7 +153,7 @@ const ComicViewer: React.FC<ComicViewerProps> = ({ comics }) => {
               <img 
                 src={comic.imageurl} 
                 alt={comic.title} 
-                className="w-full h-auto prevent-save block contrast-[1.04] brightness-[1.01]"
+                className="w-full h-auto prevent-save block contrast-[1.05] brightness-[1.01]"
                 style={{ imageRendering: 'high-quality' }}
                 onContextMenu={(e) => e.preventDefault()}
               />
@@ -182,17 +171,6 @@ const ComicViewer: React.FC<ComicViewerProps> = ({ comics }) => {
               <span key={tag} className="text-xs font-black bg-yellow-400 border-2 border-black px-4 py-2 uppercase shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]">#{tag}</span>
             ))}
           </div>
-        </div>
-
-        <div className="flex flex-col md:flex-row gap-6 justify-center items-center py-10 border-t-4 border-black mb-10">
-          {isPdf && (
-            <button 
-              onClick={openFullContent}
-              className="bg-black text-white border-4 border-black px-12 py-5 font-black uppercase tracking-tighter text-base shadow-[8px_8px_0px_0px_rgba(239,68,68,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[6px_6px_0px_0px_rgba(239,68,68,1)] active:shadow-none transition-all"
-            >
-              Open Original PDF File
-            </button>
-          )}
         </div>
 
         <div className="pt-10 border-t-2 border-black border-dashed flex items-center justify-center gap-10">
