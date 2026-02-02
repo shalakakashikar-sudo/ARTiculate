@@ -88,32 +88,52 @@ const AdminPortal: React.FC<AdminPortalProps> = ({
     }
   };
 
+  /**
+   * Sanitizes and re-encodes images to high-quality JPEG.
+   * Optimized with error handling and memory management.
+   */
   const sanitizeImageFile = async (file: File | Blob, originalName: string): Promise<File> => {
+    const url = URL.createObjectURL(file);
     return new Promise((resolve) => {
       const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) { 
-          resolve(file instanceof File ? file : new File([file], originalName)); 
-          return; 
-        }
-        
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        ctx.drawImage(img, 0, 0);
-        canvas.toBlob((blob) => {
-          if (blob) {
-            resolve(new File([blob], originalName.replace(/\.[^/.]+$/, "") + "_web.jpg", { type: 'image/jpeg' }));
-          } else {
-            resolve(file instanceof File ? file : new File([file], originalName));
-          }
-        }, 'image/jpeg', 0.95);
+      
+      // Fix: Added error handling to prevent the batch from hanging on bad files
+      const cleanupAndFallback = () => {
+        URL.revokeObjectURL(url);
+        resolve(file instanceof File ? file : new File([file], originalName));
       };
-      img.src = URL.createObjectURL(file);
+
+      img.onerror = cleanupAndFallback;
+      
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) { 
+            cleanupAndFallback();
+            return; 
+          }
+          
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(img, 0, 0);
+          
+          canvas.toBlob((blob) => {
+            URL.revokeObjectURL(url);
+            if (blob) {
+              resolve(new File([blob], originalName.replace(/\.[^/.]+$/, "") + "_web.jpg", { type: 'image/jpeg' }));
+            } else {
+              resolve(file instanceof File ? file : new File([file], originalName));
+            }
+          }, 'image/jpeg', 0.95);
+        } catch (e) {
+          console.error("Sanitization error:", e);
+          cleanupAndFallback();
+        }
+      };
+      img.src = url;
     });
   };
 
@@ -258,6 +278,10 @@ const AdminPortal: React.FC<AdminPortalProps> = ({
     }
   };
 
+  /**
+   * High-Performance Bulk Upload Handler.
+   * Processes files in concurrent batches of 3 to speed up the process significantly.
+   */
   const handleBulkUpload = async () => {
     if (bulkFiles.length === 0) return;
     setPublishStep('batch-processing');
@@ -266,7 +290,6 @@ const AdminPortal: React.FC<AdminPortalProps> = ({
     try {
       let finalFolderId = selectedFolder;
 
-      // Create folder if requested during bulk upload
       if (isCreatingNewFolder && newFolderName) {
         const { data: folderData, error: fError } = await supabase
           .from('folders')
@@ -281,16 +304,21 @@ const AdminPortal: React.FC<AdminPortalProps> = ({
         setNewFolderName('');
       }
 
-      for (let i = 0; i < bulkFiles.length; i++) {
-        const file = bulkFiles[i];
-        setBatchProgress(prev => ({ ...prev, current: i + 1 }));
+      const filesToProcess = [...bulkFiles];
+      const concurrencyLimit = 3;
+      let completedCount = 0;
+
+      const uploadTask = async (file: File, index: number) => {
         try {
-          const tempId = `${Date.now()}-${i}`;
+          const tempId = `${Date.now()}-${index}`;
           const finalFile = await sanitizeImageFile(file, file.name);
           const fileName = `${tempId}-${file.name}`;
+          
           const { error: sError } = await supabase.storage.from('comics').upload(fileName, finalFile);
-          if (sError) continue;
+          if (sError) throw sError;
+
           const { data: { publicUrl } } = supabase.storage.from('comics').getPublicUrl(fileName);
+          
           const { data: created, error: dbError } = await supabase.from('comics').insert([{
             title: file.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " "),
             imageurl: publicUrl,
@@ -304,8 +332,20 @@ const AdminPortal: React.FC<AdminPortalProps> = ({
           if (!dbError && created && created.length > 0) {
             onAdd(created[0]);
           }
-        } catch (err) { console.error(err); }
+        } catch (err) {
+          console.error(`Failed to process ${file.name}:`, err);
+        } finally {
+          completedCount++;
+          setBatchProgress({ current: completedCount, total: filesToProcess.length });
+        }
+      };
+
+      // Process in chunks to maintain concurrency while respecting rate limits
+      for (let i = 0; i < filesToProcess.length; i += concurrencyLimit) {
+        const chunk = filesToProcess.slice(i, i + concurrencyLimit);
+        await Promise.all(chunk.map((file, idx) => uploadTask(file, i + idx)));
       }
+
       setPublishStep('success');
       setBulkFiles([]);
       setTimeout(() => setPublishStep('idle'), 2000);
@@ -385,7 +425,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({
                   <div className="mt-4 w-full max-w-xs">
                     <div className="h-2 w-full bg-slate-200 border border-black">
                       <div 
-                        className="h-full bg-blue-600" 
+                        className="h-full bg-blue-600 transition-all duration-300" 
                         style={{ width: `${(batchProgress.current / batchProgress.total) * 100}%` }}
                       ></div>
                     </div>
@@ -423,7 +463,10 @@ const AdminPortal: React.FC<AdminPortalProps> = ({
             ) : (
               <div className="space-y-6">
                 <div className="bg-slate-50 border-2 border-black p-6 space-y-6">
-                  <h3 className="text-xs font-black uppercase tracking-widest border-b border-black pb-2">Batch Settings</h3>
+                  <div className="flex justify-between items-center border-b border-black pb-2">
+                    <h3 className="text-xs font-black uppercase tracking-widest">Batch Settings</h3>
+                    <span className="text-[9px] font-black uppercase bg-blue-100 text-blue-600 px-2 py-0.5 border border-blue-600">Concurrency: High</span>
+                  </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div className="space-y-1">
                       <label className="text-[9px] font-black uppercase opacity-60">Target Collection / Series</label>
@@ -441,7 +484,14 @@ const AdminPortal: React.FC<AdminPortalProps> = ({
                   <button onClick={() => bulkInputRef.current?.click()} className="bg-white border-2 border-black px-8 py-4 font-black uppercase text-xs shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
                     {bulkFiles.length > 0 ? `${bulkFiles.length} FILES READY` : 'SELECT IMAGES'}
                   </button>
-                  {bulkFiles.length > 0 && <button onClick={handleBulkUpload} className="block w-full mt-6 bg-blue-600 text-white border-2 border-black py-4 font-black uppercase text-xs">Start Mass Upload to Collection</button>}
+                  {bulkFiles.length > 0 && (
+                    <div className="mt-6">
+                      <button onClick={handleBulkUpload} className="block w-full bg-blue-600 text-white border-2 border-black py-4 font-black uppercase text-xs shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-y-[-2px] hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] transition-all">
+                        Start Fast Mass Upload
+                      </button>
+                      <p className="mt-2 text-[9px] font-bold uppercase opacity-40">Processing in parallel for maximum speed</p>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -455,7 +505,16 @@ const AdminPortal: React.FC<AdminPortalProps> = ({
           </div>
 
           <div className="bg-white border-2 border-black p-4 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] h-[300px] flex flex-col">
-            <h2 className="comic-title text-xl border-b-2 border-black pb-2 mb-4">Feed Log</h2>
+            <div className="flex justify-between items-center border-b-2 border-black pb-2 mb-4">
+              <h2 className="comic-title text-xl">Feed Log</h2>
+              <input 
+                type="text" 
+                placeholder="Find..." 
+                value={archiveSearch}
+                onChange={(e) => setArchiveSearch(e.target.value)}
+                className="w-24 text-[8px] font-black uppercase border border-black p-1 focus:ring-2 ring-yellow-400 outline-none"
+              />
+            </div>
             <div className="flex-grow overflow-y-auto space-y-2 custom-scrollbar pr-2">
               {filteredArchives.map(comic => (
                 <div key={comic.id} className="p-2 border border-black bg-slate-50 flex gap-3 items-center group">
