@@ -12,8 +12,9 @@ const GalleryCard: React.FC<{ comic: ComicEntry }> = ({ comic }) => {
   const displayUrl = comic.thumbnailurl || (comic.mimetype.startsWith('image/') ? comic.imageurl : null);
 
   return (
-    /* p-3 provides 12px of internal space, ensuring the 10px shadow is never clipped by the column box */
-    <div className="break-inside-avoid mb-4 p-3">
+    /* p-4 provides a 16px safety buffer around the card, 
+       ensuring the 10px pop-shadow is never clipped by column boundaries. */
+    <div className="break-inside-avoid mb-2 p-4">
       <Link 
         to={`/comic/${comic.id}`}
         className="group block bg-white border-[3px] border-black p-2 transition-all duration-300 hover:-translate-y-2 hover:shadow-[10px_10px_0px_0px_rgba(0,0,0,1)]"
@@ -164,7 +165,7 @@ const Gallery: React.FC<GalleryProps> = ({ comics, folders }) => {
         )}
 
         {(searchQuery || selectedTag) && (
-          <div className="mb-6 flex items-center justify-between">
+          <div className="mb-6 flex items-center justify-between px-6">
              <div className="text-xs font-black uppercase tracking-widest italic">
                 Filtering: <span className="text-red-600 underline ml-2">{searchQuery || `#${selectedTag}`}</span>
              </div>
@@ -178,12 +179,13 @@ const Gallery: React.FC<GalleryProps> = ({ comics, folders }) => {
         )}
 
         {filteredComics.length === 0 ? (
-          <div className="text-center py-40 bg-white border-4 border-black border-dashed opacity-20">
+          <div className="mx-6 text-center py-40 bg-white border-4 border-black border-dashed opacity-20">
             <h2 className="comic-title text-5xl uppercase italic tracking-tighter">The Void</h2>
           </div>
         ) : (
-          /* Using -mx-3 to counteract the card's internal padding so the edge items stay aligned with the headers above. */
-          <div className="-mx-3 columns-2 sm:columns-2 md:columns-3 lg:columns-4 xl:columns-5 gap-0 pb-10">
+          /* px-6 ensures a solid margin from the extreme edges of the container. 
+             gap-2 keeps the columns distinct while allowing pop-shadows room inside the p-4 card wrapper. */
+          <div className="px-6 columns-2 sm:columns-2 md:columns-3 lg:columns-4 xl:columns-5 gap-2 pb-10">
             {filteredComics.map((comic) => (
               <GalleryCard key={comic.id} comic={comic} />
             ))}
