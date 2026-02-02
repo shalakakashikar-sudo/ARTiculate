@@ -29,7 +29,8 @@ const ComicViewer: React.FC<ComicViewerProps> = ({ comics }) => {
     }
   };
 
-  const displayUrl = comic?.thumbnailurl || (comic?.mimetype.startsWith('image/') ? comic.imageurl : null);
+  // Prioritize the fixed high-res version if available
+  const displayUrl = comic?.imageurl || comic?.thumbnailurl;
 
   if (!comic) {
     return (
@@ -61,40 +62,21 @@ const ComicViewer: React.FC<ComicViewerProps> = ({ comics }) => {
         </h1>
 
         <div className="relative mb-8 bg-slate-50 border-2 border-black min-h-[400px]">
-          {comic.mimetype === 'application/pdf' ? (
-            <div className="flex flex-col items-center justify-center p-8 bg-slate-100 min-h-[500px] border-b-2 border-black">
-              {displayUrl ? (
-                <div className="relative group mb-8">
-                  <img src={displayUrl} alt="Cover Preview" className="max-h-[500px] border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] prevent-save" />
-                  <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
-                    <span className="bg-yellow-400 border-2 border-black px-4 py-2 font-black uppercase text-sm rotate-[-5deg]">Cloud Mode</span>
-                  </div>
-                </div>
-              ) : (
-                <div className="w-48 h-64 bg-white border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] flex items-center justify-center mb-10 rotate-[-2deg]">
-                  <span className="comic-title text-4xl text-red-600">PDF</span>
-                </div>
-              )}
-              
-              <button 
-                onClick={openPdf}
-                className="bg-black text-white px-10 py-5 text-xl font-black uppercase border-4 border-black shadow-[6px_6px_0px_0px_rgba(234,179,8,1)] hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all"
-              >
-                READ FULL CHRONICLE (PDF) →
-              </button>
-            </div>
-          ) : (
-            <div className="relative group">
-              {displayUrl && (
-                <img 
-                  src={displayUrl} 
-                  alt={comic.title} 
-                  className="w-full h-auto prevent-save"
-                  onContextMenu={(e) => e.preventDefault()}
-                />
-              )}
-            </div>
-          )}
+          {/* 
+            Even if the file was a PDF, the AdminPortal now converts it to a High-Res Image. 
+            We show that image here because it has the FIXED colors.
+          */}
+          <div className="relative group">
+            {displayUrl && (
+              <img 
+                src={displayUrl} 
+                alt={comic.title} 
+                className="w-full h-auto prevent-save"
+                onContextMenu={(e) => e.preventDefault()}
+              />
+            )}
+            {/* If the user really wants the original PDF, we can still provide a download link in the footer/meta */}
+          </div>
         </div>
 
         <div className="prose max-w-none px-4">

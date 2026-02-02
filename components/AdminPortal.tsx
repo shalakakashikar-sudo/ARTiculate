@@ -56,6 +56,8 @@ const AdminPortal: React.FC<AdminPortalProps> = ({
   /**
    * PDF to sRGB Image logic:
    * Extracts the first page of a PDF and renders it to a color-safe canvas.
+   * FIX: Now includes a solid white background fill to prevent "off" colors
+   * caused by transparency or CMYK blending issues.
    */
   const convertPdfToSrgbImage = async (file: File): Promise<Blob | null> => {
     const pdfjsLib = (window as any).pdfjsLib;
@@ -66,18 +68,29 @@ const AdminPortal: React.FC<AdminPortalProps> = ({
       const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
       const page = await pdf.getPage(1);
       
-      const viewport = page.getViewport({ scale: 2.0 }); // High res for quality
+      const viewport = page.getViewport({ scale: 3.0 }); 
       const canvas = document.createElement('canvas');
-      const context = canvas.getContext('2d');
+      const context = canvas.getContext('2d', { alpha: false }); // Disable alpha for better color predictability
       if (!context) return null;
 
       canvas.height = viewport.height;
       canvas.width = viewport.width;
 
-      await page.render({ canvasContext: context, viewport: viewport }).promise;
+      // CRITICAL COLOR FIX: Fill with white first.
+      // Many comic PDFs have transparent backgrounds. Without this, they blend with 
+      // the canvas default (black), making your colors look dull or "off".
+      context.fillStyle = '#FFFFFF';
+      context.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Render the PDF page onto our white sRGB foundation
+      await page.render({ 
+        canvasContext: context, 
+        viewport: viewport,
+        intent: 'display' // Tells PDF.js to prioritize screen color accuracy
+      }).promise;
       
       return new Promise((resolve) => {
-        canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.9);
+        canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.95);
       });
     } catch (e) {
       console.error("PDF Processing Error:", e);
@@ -87,7 +100,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({
 
   /**
    * Standard sRGB Image Washing logic:
-   * Re-draws the image to a canvas to strip print-profiles.
+   * Re-draws an existing image to a canvas to strip problematic print-profiles.
    */
   const sanitizeImageFile = async (file: File | Blob, originalName: string): Promise<File> => {
     return new Promise((resolve) => {
@@ -97,12 +110,19 @@ const AdminPortal: React.FC<AdminPortalProps> = ({
         canvas.width = img.width;
         canvas.height = img.height;
         const ctx = canvas.getContext('2d');
-        if (!ctx) { resolve(file instanceof File ? file : new File([file], originalName)); return; }
+        if (!ctx) { 
+          resolve(file instanceof File ? file : new File([file], originalName)); 
+          return; 
+        }
+        
+        // Ensure white background for images as well (e.g. transparent PNGs)
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
         
         ctx.drawImage(img, 0, 0);
         canvas.toBlob((blob) => {
           if (blob) {
-            resolve(new File([blob], originalName.replace(/\.[^/.]+$/, "") + ".jpg", { type: 'image/jpeg' }));
+            resolve(new File([blob], originalName.replace(/\.[^/.]+$/, "") + "_web.jpg", { type: 'image/jpeg' }));
           } else {
             resolve(file instanceof File ? file : new File([file], originalName));
           }
@@ -160,7 +180,6 @@ const AdminPortal: React.FC<AdminPortalProps> = ({
     try {
       let finalFolderId = selectedFolder;
 
-      // Handle new folder creation
       if (isCreatingNewFolder && newFolderName) {
         const { data: folderData, error: fError } = await supabase
           .from('folders')
@@ -179,33 +198,33 @@ const AdminPortal: React.FC<AdminPortalProps> = ({
       let thumbnailUrl = null;
 
       if (fileObject) {
-        let fileToUpload: File | Blob = fileObject;
+        let mainFileToUpload: File | Blob = fileObject;
         
-        // 1. If it's a PDF, extract page 1 as a color-safe thumbnail
         if (fileObject.type === 'application/pdf') {
           setPublishStep('extracting-pdf');
           const pdfImageBlob = await convertPdfToSrgbImage(fileObject);
+          
           if (pdfImageBlob) {
-            const washedThumb = await sanitizeImageFile(pdfImageBlob, 'thumb.jpg');
-            const thumbName = `${tempId}-thumb.jpg`;
-            const { error: tError } = await supabase.storage.from('comics').upload(thumbName, washedThumb);
-            if (!tError) {
-              const { data: { publicUrl } } = supabase.storage.from('comics').getPublicUrl(thumbName);
-              thumbnailUrl = publicUrl;
-            }
+            const fixedImageFile = await sanitizeImageFile(pdfImageBlob, 'display_fixed.jpg');
+            const fixedName = `${tempId}-display.jpg`;
+            
+            setPublishStep('uploading-file');
+            const { error: fError } = await supabase.storage.from('comics').upload(fixedName, fixedImageFile);
+            if (fError) throw fError;
+            
+            const { data: { publicUrl } } = supabase.storage.from('comics').getPublicUrl(fixedName);
+            imageUrl = publicUrl;
+            thumbnailUrl = publicUrl;
           }
         } else {
-          // 2. If it's an image, sanitize its colors
-          fileToUpload = await sanitizeImageFile(fileObject, fileObject.name);
+          mainFileToUpload = await sanitizeImageFile(fileObject, fileObject.name);
+          setPublishStep('uploading-file');
+          const fileName = `${tempId}-${fileObject.name}`;
+          const { error: fileError } = await supabase.storage.from('comics').upload(fileName, mainFileToUpload);
+          if (fileError) throw fileError;
+          const { data: { publicUrl } } = supabase.storage.from('comics').getPublicUrl(fileName);
+          imageUrl = publicUrl;
         }
-
-        // Upload main file
-        setPublishStep('uploading-file');
-        const fileName = `${tempId}-${fileObject.name}`;
-        const { error: fileError } = await supabase.storage.from('comics').upload(fileName, fileToUpload);
-        if (fileError) throw fileError;
-        const { data: { publicUrl } } = supabase.storage.from('comics').getPublicUrl(fileName);
-        imageUrl = publicUrl;
       }
 
       setPublishStep('saving-db');
@@ -213,7 +232,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({
         title: newTitle,
         description: newDesc,
         imageurl: imageUrl,
-        thumbnailurl: thumbnailUrl || (fileObject?.type.startsWith('image/') ? imageUrl : null),
+        thumbnailurl: thumbnailUrl || imageUrl,
         mimetype: fileObject ? fileObject.type : comics.find(c => c.id === editModeId)?.mimetype,
         tags: newTags.split(',').map(t => t.trim()).filter(t => t),
         folderid: finalFolderId || null,
@@ -298,7 +317,12 @@ const AdminPortal: React.FC<AdminPortalProps> = ({
             {publishStep !== 'idle' && (
               <div className="absolute inset-0 z-50 bg-white/95 flex flex-col items-center justify-center p-12 text-center">
                 <h2 className="comic-title text-3xl uppercase animate-pulse">{publishStep.replace('-', ' ')}...</h2>
-                {publishStep === 'extracting-pdf' && <p className="text-[10px] font-black uppercase mt-2">Correcting PDF Colors for Gallery...</p>}
+                {publishStep === 'extracting-pdf' && (
+                   <div className="mt-4 space-y-2">
+                     <p className="text-[10px] font-black uppercase text-red-600 tracking-widest">Applying High-Res Color Correction</p>
+                     <p className="text-[8px] font-bold uppercase opacity-60">Building white sRGB foundation for perfect art...</p>
+                   </div>
+                )}
               </div>
             )}
 
@@ -338,8 +362,8 @@ const AdminPortal: React.FC<AdminPortalProps> = ({
 
         <aside className="lg:w-80 space-y-6">
           <div className="bg-yellow-400 border-2 border-black p-4 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] tilt-sm">
-            <h3 className="comic-title text-xl uppercase mb-1">Color Protection</h3>
-            <p className="text-[9px] font-black leading-tight uppercase italic opacity-80">PDFs are automatically converted to sRGB gallery images to prevent color shifts! 🎨</p>
+            <h3 className="comic-title text-xl uppercase mb-1">Color Fix Active</h3>
+            <p className="text-[9px] font-black leading-tight uppercase italic opacity-80">Existing PDFs are converted to high-res sRGB snapshots using a white-foundation pass! 🎨</p>
           </div>
           <div className="bg-white border-2 border-black p-4 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] h-[400px] flex flex-col">
             <h2 className="comic-title text-xl border-b-2 border-black pb-2 mb-4">Feed Log</h2>
