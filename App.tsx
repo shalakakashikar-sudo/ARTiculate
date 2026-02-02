@@ -127,14 +127,19 @@ const App: React.FC = () => {
   const handleDeleteFolder = async (id: string) => {
     if (!isSupabaseConfigured) return;
     try {
+      // Note: We delete the folder. Associated comics will remain in DB but with null folderid
+      // because we want to avoid accidental bulk data loss unless explicitly requested.
+      // However, to reflect this in UI, we update the local state.
       const { error } = await supabase
         .from('folders')
         .delete()
         .eq('id', id);
       
       if (error) throw error;
+      
       setFolders(prev => prev.filter(f => f.id !== id));
-      setComics(prev => prev.filter(c => c.folderid === id));
+      // Update comics that were in this folder to be 'standalone'
+      setComics(prev => prev.map(c => c.folderid === id ? { ...c, folderid: undefined } : c));
     } catch (err: any) {
       console.error("Series Deletion Failed:", err);
       alert(`COULD NOT DELETE SERIES: ${err.message}`);

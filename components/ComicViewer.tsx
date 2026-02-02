@@ -1,7 +1,12 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { ComicEntry } from '../types';
+
+// Setup PDF.js worker
+if (typeof window !== 'undefined' && (window as any).pdfjsLib) {
+  (window as any).pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+}
 
 interface ComicViewerProps {
   comics: ComicEntry[];
@@ -11,13 +16,69 @@ const ComicViewer: React.FC<ComicViewerProps> = ({ comics }) => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [comic, setComic] = useState<ComicEntry | null>(null);
+  const [pdfPages, setPdfPages] = useState<string[]>([]);
+  const [loadingPdf, setLoadingPdf] = useState(false);
 
   useEffect(() => {
     const found = comics.find(c => c.id === id);
     if (found) {
       setComic(found);
+      setPdfPages([]); // Reset pages when switching comics
     }
   }, [id, comics]);
+
+  /**
+   * High-Fidelity PDF Multi-Page Renderer
+   * Renders every page of the chronicle to a color-safe sRGB JPEG
+   * using a "white foundation" pass to guarantee original artist colors.
+   */
+  const renderPdfChronicle = useCallback(async (url: string) => {
+    const pdfjsLib = (window as any).pdfjsLib;
+    if (!pdfjsLib) return;
+
+    setLoadingPdf(true);
+    try {
+      const pdf = await pdfjsLib.getDocument(url).promise;
+      const pagesCount = pdf.numPages;
+      const renderedPages: string[] = [];
+
+      // Loop through all pages to ensure the "Full Chronicle" is visible
+      for (let i = 1; i <= pagesCount; i++) {
+        const page = await pdf.getPage(i);
+        const viewport = page.getViewport({ scale: 2.5 }); // High-resolution render scale
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d', { alpha: false });
+        
+        if (context) {
+          canvas.height = viewport.height;
+          canvas.width = viewport.width;
+
+          // COLOR FIX: Fill with solid white first to fix CMYK transparency issues
+          context.fillStyle = '#FFFFFF';
+          context.fillRect(0, 0, canvas.width, canvas.height);
+
+          await page.render({ 
+            canvasContext: context, 
+            viewport: viewport,
+            intent: 'display' // Optimize for screen color accuracy
+          }).promise;
+          
+          renderedPages.push(canvas.toDataURL('image/jpeg', 0.92));
+        }
+      }
+      setPdfPages(renderedPages);
+    } catch (err) {
+      console.error("PDF Rendering Failed:", err);
+    } finally {
+      setLoadingPdf(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (comic && comic.mimetype === 'application/pdf' && comic.imageurl) {
+      renderPdfChronicle(comic.imageurl);
+    }
+  }, [comic, renderPdfChronicle]);
 
   const openFullContent = () => {
     if (!comic || !comic.imageurl) return;
@@ -38,11 +99,7 @@ const ComicViewer: React.FC<ComicViewerProps> = ({ comics }) => {
     );
   }
 
-  // Logic: For PDFs, the 'thumbnailurl' is the high-res first page image.
-  // 'imageurl' is the actual PDF file.
   const isPdf = comic.mimetype === 'application/pdf';
-  const displayUrl = isPdf ? (comic.thumbnailurl || comic.imageurl) : comic.imageurl;
-
   const currentIndex = comics.findIndex(c => c.id === comic.id);
   const prevComic = currentIndex < comics.length - 1 ? comics[currentIndex + 1] : null;
   const nextComic = currentIndex > 0 ? comics[currentIndex - 1] : null;
@@ -59,54 +116,79 @@ const ComicViewer: React.FC<ComicViewerProps> = ({ comics }) => {
       </div>
 
       <div className="bg-white border-4 border-black p-2 md:p-6 shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] relative">
-        <h1 className="comic-title text-4xl md:text-6xl mb-6 text-center border-b-4 border-black pb-4">
-          {comic.title}
-        </h1>
+        <header className="mb-6 text-center border-b-4 border-black pb-4">
+          <h1 className="comic-title text-4xl md:text-6xl mb-2 italic">
+            {comic.title}
+          </h1>
+          {isPdf && (
+            <span className="text-[10px] font-black bg-blue-600 text-white px-3 py-1 uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] tracking-widest">
+              Full Multi-Page Chronicle
+            </span>
+          )}
+        </header>
 
-        <div className="relative mb-8 bg-slate-50 border-2 border-black min-h-[400px]">
-          <div className="relative group cursor-pointer" onClick={isPdf ? openFullContent : undefined}>
-            {displayUrl && (
+        <div className="space-y-6 mb-10">
+          {isPdf ? (
+            <>
+              {loadingPdf ? (
+                <div className="py-40 text-center bg-slate-50 border-2 border-black border-dashed">
+                  <div className="animate-spin h-10 w-10 border-4 border-black border-t-red-600 rounded-full mx-auto mb-4"></div>
+                  <p className="comic-title text-xl uppercase italic">Fixing original colours for web...</p>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-8">
+                  {pdfPages.map((pageUrl, idx) => (
+                    <div key={idx} className="bg-white border-2 border-black overflow-hidden shadow-[6px_6px_0px_0px_rgba(0,0,0,0.05)]">
+                      <img 
+                        src={pageUrl} 
+                        alt={`${comic.title} - Page ${idx + 1}`} 
+                        className="w-full h-auto prevent-save"
+                        onContextMenu={(e) => e.preventDefault()}
+                      />
+                      <div className="bg-slate-50 border-t border-black p-2 text-right">
+                         <span className="text-[8px] font-black uppercase opacity-40">Page {idx + 1} of {pdfPages.length}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="bg-slate-50 border-2 border-black overflow-hidden shadow-[6px_6px_0px_0px_rgba(0,0,0,0.05)]">
               <img 
-                src={displayUrl} 
+                src={comic.imageurl} 
                 alt={comic.title} 
-                className="w-full h-auto prevent-save transition-opacity hover:opacity-90"
+                className="w-full h-auto prevent-save"
                 onContextMenu={(e) => e.preventDefault()}
               />
-            )}
-            
-            {isPdf && (
-              <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                 <div className="bg-black text-white px-6 py-3 border-2 border-white font-black uppercase text-xs shadow-lg">
-                    Click to Open Full PDF
-                 </div>
-              </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
-        {isPdf && (
-           <div className="flex justify-center mb-10">
-              <button 
-                onClick={openFullContent}
-                className="bg-red-600 text-white border-4 border-black px-12 py-5 font-black uppercase tracking-tighter text-xl shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:shadow-none transition-all"
-              >
-                Read Full Chronicle (PDF)
-              </button>
-           </div>
-        )}
-
         <div className="prose max-w-none px-4">
-          <p className="text-lg text-slate-700 leading-relaxed font-medium mb-4 italic">
+          <div className="marker-font text-2xl text-blue-600 mb-2">Notes from the Artist</div>
+          <p className="text-lg text-slate-700 leading-relaxed font-medium mb-6 italic">
             "{comic.description}"
           </p>
           <div className="flex flex-wrap gap-2 mb-8">
             {comic.tags.map(tag => (
-              <span key={tag} className="text-xs font-bold bg-yellow-400 border border-black px-3 py-1 uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">#{tag}</span>
+              <span key={tag} className="text-[10px] font-black bg-yellow-400 border border-black px-3 py-1.5 uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">#{tag}</span>
             ))}
           </div>
         </div>
 
-        <div className="mt-8 pt-8 border-t-4 border-black flex items-center justify-center gap-6">
+        <div className="flex flex-col md:flex-row gap-4 justify-center items-center py-8 border-t-4 border-black mb-8">
+          {isPdf && (
+            <button 
+              onClick={openFullContent}
+              className="bg-black text-white border-4 border-black px-10 py-4 font-black uppercase tracking-tighter text-sm shadow-[6px_6px_0px_0px_rgba(239,68,68,1)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[4px_4px_0px_0px_rgba(239,68,68,1)] active:shadow-none transition-all"
+            >
+              Open Original PDF File
+            </button>
+          )}
+        </div>
+
+        <div className="pt-8 border-t-2 border-black border-dashed flex items-center justify-center gap-6">
           <button 
             disabled={!prevComic}
             onClick={() => navigate(`/comic/${prevComic?.id}`)}

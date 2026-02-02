@@ -182,7 +182,6 @@ const AdminPortal: React.FC<AdminPortalProps> = ({
         setNewFolderName('');
       }
 
-      // PRESERVE EXISTING URLS ON EDIT
       const existingComic = editModeId ? comics.find(c => c.id === editModeId) : null;
       let imageUrl = existingComic?.imageurl || '';
       let thumbnailUrl = existingComic?.thumbnailurl || null;
@@ -398,7 +397,8 @@ const AdminPortal: React.FC<AdminPortalProps> = ({
             <h3 className="comic-title text-xl uppercase mb-1">Hybrid Upload</h3>
             <p className="text-[9px] font-black leading-tight uppercase italic opacity-80">PDFs now keep their original file while generating high-res sRGB snapshots for the gallery! 🎨</p>
           </div>
-          <div className="bg-white border-2 border-black p-4 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] h-[400px] flex flex-col">
+
+          <div className="bg-white border-2 border-black p-4 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] h-[300px] flex flex-col">
             <h2 className="comic-title text-xl border-b-2 border-black pb-2 mb-4">Feed Log</h2>
             <div className="flex-grow overflow-y-auto space-y-2 custom-scrollbar pr-2">
               {filteredArchives.map(comic => (
@@ -415,6 +415,32 @@ const AdminPortal: React.FC<AdminPortalProps> = ({
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+
+          <div className="bg-white border-2 border-black p-4 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] h-[250px] flex flex-col">
+            <h2 className="comic-title text-xl border-b-2 border-black pb-2 mb-4 uppercase">Manage Collections</h2>
+            <div className="flex-grow overflow-y-auto space-y-2 custom-scrollbar pr-2">
+              {folders.length === 0 ? (
+                <p className="text-[10px] font-bold text-slate-400 uppercase italic">No series collections found.</p>
+              ) : (
+                folders.map(folder => (
+                  <div key={folder.id} className="p-3 border border-black bg-slate-50 flex justify-between items-center hover:bg-yellow-50 transition-colors">
+                    <div className="min-w-0 flex-grow">
+                      <h4 className="font-black text-[10px] uppercase truncate">{folder.name}</h4>
+                      <p className="text-[8px] font-bold opacity-40 uppercase">
+                        {comics.filter(c => c.folderid === folder.id).length} Entries
+                      </p>
+                    </div>
+                    <button 
+                      onClick={() => confirm(`Permanently delete the collection "${folder.name}"?\nAssociated comics will become standalone.`) && onDeleteFolder(folder.id)} 
+                      className="text-[8px] font-black text-red-600 uppercase border border-red-600 px-2 py-1 hover:bg-red-600 hover:text-white transition-colors"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </aside>
