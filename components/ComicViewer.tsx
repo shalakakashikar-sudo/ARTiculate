@@ -19,18 +19,15 @@ const ComicViewer: React.FC<ComicViewerProps> = ({ comics }) => {
     }
   }, [id, comics]);
 
-  const openPdf = () => {
+  const openFullContent = () => {
     if (!comic || !comic.imageurl) return;
     const win = window.open(comic.imageurl, '_blank');
     if (win) {
       win.focus();
     } else {
-      alert("Pop-up blocked! Please allow pop-ups to read the chronicle.");
+      alert("Pop-up blocked! Please allow pop-ups to view the chronicle.");
     }
   };
-
-  // Prioritize the fixed high-res version if available
-  const displayUrl = comic?.imageurl || comic?.thumbnailurl;
 
   if (!comic) {
     return (
@@ -40,6 +37,11 @@ const ComicViewer: React.FC<ComicViewerProps> = ({ comics }) => {
       </div>
     );
   }
+
+  // Logic: For PDFs, the 'thumbnailurl' is the high-res first page image.
+  // 'imageurl' is the actual PDF file.
+  const isPdf = comic.mimetype === 'application/pdf';
+  const displayUrl = isPdf ? (comic.thumbnailurl || comic.imageurl) : comic.imageurl;
 
   const currentIndex = comics.findIndex(c => c.id === comic.id);
   const prevComic = currentIndex < comics.length - 1 ? comics[currentIndex + 1] : null;
@@ -62,22 +64,36 @@ const ComicViewer: React.FC<ComicViewerProps> = ({ comics }) => {
         </h1>
 
         <div className="relative mb-8 bg-slate-50 border-2 border-black min-h-[400px]">
-          {/* 
-            Even if the file was a PDF, the AdminPortal now converts it to a High-Res Image. 
-            We show that image here because it has the FIXED colors.
-          */}
-          <div className="relative group">
+          <div className="relative group cursor-pointer" onClick={isPdf ? openFullContent : undefined}>
             {displayUrl && (
               <img 
                 src={displayUrl} 
                 alt={comic.title} 
-                className="w-full h-auto prevent-save"
+                className="w-full h-auto prevent-save transition-opacity hover:opacity-90"
                 onContextMenu={(e) => e.preventDefault()}
               />
             )}
-            {/* If the user really wants the original PDF, we can still provide a download link in the footer/meta */}
+            
+            {isPdf && (
+              <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                 <div className="bg-black text-white px-6 py-3 border-2 border-white font-black uppercase text-xs shadow-lg">
+                    Click to Open Full PDF
+                 </div>
+              </div>
+            )}
           </div>
         </div>
+
+        {isPdf && (
+           <div className="flex justify-center mb-10">
+              <button 
+                onClick={openFullContent}
+                className="bg-red-600 text-white border-4 border-black px-12 py-5 font-black uppercase tracking-tighter text-xl shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:shadow-none transition-all"
+              >
+                Read Full Chronicle (PDF)
+              </button>
+           </div>
+        )}
 
         <div className="prose max-w-none px-4">
           <p className="text-lg text-slate-700 leading-relaxed font-medium mb-4 italic">

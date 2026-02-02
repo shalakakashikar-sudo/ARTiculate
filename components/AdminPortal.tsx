@@ -53,12 +53,6 @@ const AdminPortal: React.FC<AdminPortalProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const bulkInputRef = useRef<HTMLInputElement>(null);
 
-  /**
-   * PDF to sRGB Image logic:
-   * Extracts the first page of a PDF and renders it to a color-safe canvas.
-   * FIX: Now includes a solid white background fill to prevent "off" colors
-   * caused by transparency or CMYK blending issues.
-   */
   const convertPdfToSrgbImage = async (file: File): Promise<Blob | null> => {
     const pdfjsLib = (window as any).pdfjsLib;
     if (!pdfjsLib) return null;
@@ -70,21 +64,19 @@ const AdminPortal: React.FC<AdminPortalProps> = ({
       
       const viewport = page.getViewport({ scale: 3.0 }); 
       const canvas = document.createElement('canvas');
-      const context = canvas.getContext('2d', { alpha: false }); // Disable alpha for better color predictability
+      const context = canvas.getContext('2d', { alpha: false });
       if (!context) return null;
 
       canvas.height = viewport.height;
       canvas.width = viewport.width;
 
-      // CRITICAL COLOR FIX: Fill with white first.
       context.fillStyle = '#FFFFFF';
       context.fillRect(0, 0, canvas.width, canvas.height);
 
-      // Render the PDF page onto our white sRGB foundation
       await page.render({ 
         canvasContext: context, 
         viewport: viewport,
-        intent: 'display' // Tells PDF.js to prioritize screen color accuracy
+        intent: 'display'
       }).promise;
       
       return new Promise((resolve) => {
@@ -96,10 +88,6 @@ const AdminPortal: React.FC<AdminPortalProps> = ({
     }
   };
 
-  /**
-   * Standard sRGB Image Washing logic:
-   * Re-draws an existing image to a canvas to strip problematic print-profiles.
-   */
   const sanitizeImageFile = async (file: File | Blob, originalName: string): Promise<File> => {
     return new Promise((resolve) => {
       const img = new Image();
@@ -194,36 +182,42 @@ const AdminPortal: React.FC<AdminPortalProps> = ({
         setNewFolderName('');
       }
 
-      let imageUrl = previewUrl || '';
-      let thumbnailUrl = null;
+      // PRESERVE EXISTING URLS ON EDIT
+      const existingComic = editModeId ? comics.find(c => c.id === editModeId) : null;
+      let imageUrl = existingComic?.imageurl || '';
+      let thumbnailUrl = existingComic?.thumbnailurl || null;
 
       if (fileObject) {
-        let mainFileToUpload: File | Blob = fileObject;
-        
         if (fileObject.type === 'application/pdf') {
+          setPublishStep('uploading-file');
+          const pdfFileName = `${tempId}-original.pdf`;
+          const { error: pdfUploadError } = await supabase.storage.from('comics').upload(pdfFileName, fileObject);
+          if (pdfUploadError) throw pdfUploadError;
+          const { data: { publicUrl: pdfPublicUrl } } = supabase.storage.from('comics').getPublicUrl(pdfFileName);
+          imageUrl = pdfPublicUrl; 
+
           setPublishStep('extracting-pdf');
           const pdfImageBlob = await convertPdfToSrgbImage(fileObject);
-          
           if (pdfImageBlob) {
-            const fixedImageFile = await sanitizeImageFile(pdfImageBlob, 'display_fixed.jpg');
-            const fixedName = `${tempId}-display.jpg`;
+            const fixedImageFile = await sanitizeImageFile(pdfImageBlob, 'preview.jpg');
+            const fixedName = `${tempId}-preview.jpg`;
             
-            setPublishStep('uploading-file');
-            const { error: fError } = await supabase.storage.from('comics').upload(fixedName, fixedImageFile);
-            if (fError) throw fError;
+            setPublishStep('uploading-thumb');
+            const { error: thumbError } = await supabase.storage.from('comics').upload(fixedName, fixedImageFile);
+            if (thumbError) throw thumbError;
             
-            const { data: { publicUrl } } = supabase.storage.from('comics').getPublicUrl(fixedName);
-            imageUrl = publicUrl;
-            thumbnailUrl = publicUrl;
+            const { data: { publicUrl: thumbPublicUrl } } = supabase.storage.from('comics').getPublicUrl(fixedName);
+            thumbnailUrl = thumbPublicUrl; 
           }
         } else {
-          mainFileToUpload = await sanitizeImageFile(fileObject, fileObject.name);
+          const mainFileToUpload = await sanitizeImageFile(fileObject, fileObject.name);
           setPublishStep('uploading-file');
           const fileName = `${tempId}-${fileObject.name}`;
           const { error: fileError } = await supabase.storage.from('comics').upload(fileName, mainFileToUpload);
           if (fileError) throw fileError;
           const { data: { publicUrl } } = supabase.storage.from('comics').getPublicUrl(fileName);
           imageUrl = publicUrl;
+          thumbnailUrl = publicUrl;
         }
       }
 
@@ -233,7 +227,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({
         description: newDesc,
         imageurl: imageUrl,
         thumbnailurl: thumbnailUrl || imageUrl,
-        mimetype: fileObject ? fileObject.type : comics.find(c => c.id === editModeId)?.mimetype,
+        mimetype: fileObject ? fileObject.type : (existingComic?.mimetype || 'image/jpeg'),
         tags: newTags.split(',').map(t => t.trim()).filter(t => t),
         folderid: finalFolderId || null,
         date: new Date().toISOString()
@@ -319,8 +313,8 @@ const AdminPortal: React.FC<AdminPortalProps> = ({
                 <h2 className="comic-title text-3xl uppercase animate-pulse">{publishStep.replace('-', ' ')}...</h2>
                 {publishStep === 'extracting-pdf' && (
                    <div className="mt-4 space-y-2">
-                     <p className="text-[10px] font-black uppercase text-red-600 tracking-widest">Applying High-Res Color Correction</p>
-                     <p className="text-[8px] font-bold uppercase opacity-60">Building white sRGB foundation for perfect art...</p>
+                     <p className="text-[10px] font-black uppercase text-red-600 tracking-widest">Generating High-Res Preview</p>
+                     <p className="text-[8px] font-bold uppercase opacity-60">Building white sRGB foundation for web view...</p>
                    </div>
                 )}
               </div>
@@ -336,7 +330,6 @@ const AdminPortal: React.FC<AdminPortalProps> = ({
                   <div className="space-y-4">
                     <input type="text" placeholder="TITLE" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} className="w-full border-2 border-black p-3 font-black text-xs outline-none focus:ring-4 ring-yellow-400" />
                     
-                    {/* Series Selection Area */}
                     <div className="space-y-2">
                       <div className="flex gap-2">
                         {!isCreatingNewFolder ? (
@@ -402,8 +395,8 @@ const AdminPortal: React.FC<AdminPortalProps> = ({
 
         <aside className="lg:w-80 space-y-6">
           <div className="bg-yellow-400 border-2 border-black p-4 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] tilt-sm">
-            <h3 className="comic-title text-xl uppercase mb-1">Color Fix Active</h3>
-            <p className="text-[9px] font-black leading-tight uppercase italic opacity-80">Existing PDFs are converted to high-res sRGB snapshots using a white-foundation pass! 🎨</p>
+            <h3 className="comic-title text-xl uppercase mb-1">Hybrid Upload</h3>
+            <p className="text-[9px] font-black leading-tight uppercase italic opacity-80">PDFs now keep their original file while generating high-res sRGB snapshots for the gallery! 🎨</p>
           </div>
           <div className="bg-white border-2 border-black p-4 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] h-[400px] flex flex-col">
             <h2 className="comic-title text-xl border-b-2 border-black pb-2 mb-4">Feed Log</h2>
