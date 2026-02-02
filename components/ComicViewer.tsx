@@ -133,11 +133,12 @@ const ComicViewer: React.FC<ComicViewerProps> = ({ comics }) => {
                 <div className="flex flex-col gap-12">
                   {pdfPages.map((pageUrl, idx) => (
                     <div key={idx} className="bg-white border-[3px] border-black overflow-hidden shadow-[10px_10px_0px_0px_rgba(0,0,0,0.05)]">
+                      {/* FIX: Changed invalid 'high-quality' to 'auto' for imageRendering property to resolve TypeScript error */}
                       <img 
                         src={pageUrl} 
                         alt={`${comic.title} - Page ${idx + 1}`} 
                         className="w-full h-auto prevent-save block contrast-[1.05] brightness-[1.01]"
-                        style={{ imageRendering: 'high-quality' }}
+                        style={{ imageRendering: 'auto' }}
                         onContextMenu={(e) => e.preventDefault()}
                       />
                       <div className="bg-slate-50 border-t-2 border-black p-3 text-right">
@@ -150,11 +151,12 @@ const ComicViewer: React.FC<ComicViewerProps> = ({ comics }) => {
             </>
           ) : (
             <div className="bg-white border-[3px] border-black overflow-hidden shadow-[10px_10px_0px_0px_rgba(0,0,0,0.08)]">
+              {/* FIX: Changed invalid 'high-quality' to 'auto' for imageRendering property to resolve TypeScript error */}
               <img 
                 src={comic.imageurl} 
                 alt={comic.title} 
                 className="w-full h-auto prevent-save block contrast-[1.05] brightness-[1.01]"
-                style={{ imageRendering: 'high-quality' }}
+                style={{ imageRendering: 'auto' }}
                 onContextMenu={(e) => e.preventDefault()}
               />
             </div>

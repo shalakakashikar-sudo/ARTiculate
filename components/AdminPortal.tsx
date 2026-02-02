@@ -263,35 +263,106 @@ const AdminPortal: React.FC<AdminPortalProps> = ({
     setPublishStep('batch-processing');
     setBatchProgress({ current: 0, total: bulkFiles.length });
 
-    for (let i = 0; i < bulkFiles.length; i++) {
-      const file = bulkFiles[i];
-      setBatchProgress(prev => ({ ...prev, current: i + 1 }));
-      try {
-        const tempId = `${Date.now()}-${i}`;
-        const finalFile = await sanitizeImageFile(file, file.name);
-        const fileName = `${tempId}-${file.name}`;
-        const { error: sError } = await supabase.storage.from('comics').upload(fileName, finalFile);
-        if (sError) continue;
-        const { data: { publicUrl } } = supabase.storage.from('comics').getPublicUrl(fileName);
-        await supabase.from('comics').insert([{
-          title: file.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " "),
-          imageurl: publicUrl,
-          thumbnailurl: publicUrl,
-          mimetype: file.type,
-          tags: newTags.split(',').map(t => t.trim()).filter(t => t),
-          folderid: selectedFolder || null,
-          date: new Date().toISOString()
-        }]);
-      } catch (err) { console.error(err); }
+    try {
+      let finalFolderId = selectedFolder;
+
+      // Create folder if requested during bulk upload
+      if (isCreatingNewFolder && newFolderName) {
+        const { data: folderData, error: fError } = await supabase
+          .from('folders')
+          .insert([{ name: newFolderName, description: '' }])
+          .select();
+        if (fError) throw fError;
+        if (folderData && folderData.length > 0) {
+          onAddFolder(folderData[0]);
+          finalFolderId = folderData[0].id;
+        }
+        setIsCreatingNewFolder(false);
+        setNewFolderName('');
+      }
+
+      for (let i = 0; i < bulkFiles.length; i++) {
+        const file = bulkFiles[i];
+        setBatchProgress(prev => ({ ...prev, current: i + 1 }));
+        try {
+          const tempId = `${Date.now()}-${i}`;
+          const finalFile = await sanitizeImageFile(file, file.name);
+          const fileName = `${tempId}-${file.name}`;
+          const { error: sError } = await supabase.storage.from('comics').upload(fileName, finalFile);
+          if (sError) continue;
+          const { data: { publicUrl } } = supabase.storage.from('comics').getPublicUrl(fileName);
+          const { data: created, error: dbError } = await supabase.from('comics').insert([{
+            title: file.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " "),
+            imageurl: publicUrl,
+            thumbnailurl: publicUrl,
+            mimetype: file.type,
+            tags: newTags.split(',').map(t => t.trim()).filter(t => t),
+            folderid: finalFolderId || null,
+            date: new Date().toISOString()
+          }]).select();
+          
+          if (!dbError && created && created.length > 0) {
+            onAdd(created[0]);
+          }
+        } catch (err) { console.error(err); }
+      }
+      setPublishStep('success');
+      setBulkFiles([]);
+      setTimeout(() => setPublishStep('idle'), 2000);
+    } catch (err: any) {
+      setPublishStep('error');
+      setErrorMessage(err.message);
+      setTimeout(() => setPublishStep('idle'), 3000);
     }
-    setPublishStep('success');
-    setBulkFiles([]);
-    setTimeout(() => setPublishStep('idle'), 2000);
   };
 
   const filteredArchives = useMemo(() => {
     return comics.filter(c => c.title.toLowerCase().includes(archiveSearch.toLowerCase()));
   }, [comics, archiveSearch]);
+
+  const folderSelectionUI = (
+    <div className="space-y-2">
+      <div className="flex gap-2">
+        {!isCreatingNewFolder ? (
+          <>
+            <select 
+              value={selectedFolder} 
+              onChange={(e) => setSelectedFolder(e.target.value)} 
+              className="flex-grow border-2 border-black p-3 font-black text-[10px] uppercase outline-none focus:ring-4 ring-yellow-400"
+            >
+              <option value="">Standalone / No Series</option>
+              {folders.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+            </select>
+            <button 
+              type="button" 
+              onClick={() => setIsCreatingNewFolder(true)}
+              className="bg-white border-2 border-black px-4 font-black text-[10px] uppercase hover:bg-yellow-400 transition-colors shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:shadow-none"
+            >
+              New
+            </button>
+          </>
+        ) : (
+          <>
+            <input 
+              type="text" 
+              placeholder="NEW SERIES NAME" 
+              value={newFolderName} 
+              onChange={(e) => setNewFolderName(e.target.value)} 
+              className="flex-grow border-2 border-black p-3 font-black text-[10px] uppercase outline-none focus:ring-4 ring-yellow-400"
+              autoFocus
+            />
+            <button 
+              type="button" 
+              onClick={() => {setIsCreatingNewFolder(false); setNewFolderName('');}}
+              className="bg-white border-2 border-black px-4 font-black text-[10px] uppercase hover:bg-red-400 hover:text-white transition-colors shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:shadow-none"
+            >
+              Cancel
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
 
   return (
     <div className="max-w-7xl mx-auto pb-20 animate-fadeIn">
@@ -310,12 +381,18 @@ const AdminPortal: React.FC<AdminPortalProps> = ({
             {publishStep !== 'idle' && (
               <div className="absolute inset-0 z-50 bg-white/95 flex flex-col items-center justify-center p-12 text-center">
                 <h2 className="comic-title text-3xl uppercase animate-pulse">{publishStep.replace('-', ' ')}...</h2>
-                {publishStep === 'extracting-pdf' && (
-                   <div className="mt-4 space-y-2">
-                     <p className="text-[10px] font-black uppercase text-red-600 tracking-widest">Generating High-Res Preview</p>
-                     <p className="text-[8px] font-bold uppercase opacity-60">Building white sRGB foundation for web view...</p>
-                   </div>
+                {publishStep === 'batch-processing' && (
+                  <div className="mt-4 w-full max-w-xs">
+                    <div className="h-2 w-full bg-slate-200 border border-black">
+                      <div 
+                        className="h-full bg-blue-600" 
+                        style={{ width: `${(batchProgress.current / batchProgress.total) * 100}%` }}
+                      ></div>
+                    </div>
+                    <p className="mt-2 text-[10px] font-black uppercase">Processing {batchProgress.current} of {batchProgress.total}</p>
+                  </div>
                 )}
+                {publishStep === 'error' && <p className="text-red-600 font-black mt-4">{errorMessage}</p>}
               </div>
             )}
 
@@ -329,47 +406,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({
                   <div className="space-y-4">
                     <input type="text" placeholder="TITLE" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} className="w-full border-2 border-black p-3 font-black text-xs outline-none focus:ring-4 ring-yellow-400" />
                     
-                    <div className="space-y-2">
-                      <div className="flex gap-2">
-                        {!isCreatingNewFolder ? (
-                          <>
-                            <select 
-                              value={selectedFolder} 
-                              onChange={(e) => setSelectedFolder(e.target.value)} 
-                              className="flex-grow border-2 border-black p-3 font-black text-[10px] uppercase outline-none focus:ring-4 ring-yellow-400"
-                            >
-                              <option value="">Standalone</option>
-                              {folders.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
-                            </select>
-                            <button 
-                              type="button" 
-                              onClick={() => setIsCreatingNewFolder(true)}
-                              className="bg-white border-2 border-black px-4 font-black text-[10px] uppercase hover:bg-yellow-400 transition-colors shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:shadow-none"
-                            >
-                              New
-                            </button>
-                          </>
-                        ) : (
-                          <>
-                            <input 
-                              type="text" 
-                              placeholder="NEW SERIES NAME" 
-                              value={newFolderName} 
-                              onChange={(e) => setNewFolderName(e.target.value)} 
-                              className="flex-grow border-2 border-black p-3 font-black text-[10px] uppercase outline-none focus:ring-4 ring-yellow-400"
-                              autoFocus
-                            />
-                            <button 
-                              type="button" 
-                              onClick={() => {setIsCreatingNewFolder(false); setNewFolderName('');}}
-                              className="bg-white border-2 border-black px-4 font-black text-[10px] uppercase hover:bg-red-400 hover:text-white transition-colors shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:shadow-none"
-                            >
-                              Cancel
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </div>
+                    {folderSelectionUI}
 
                     <input type="text" placeholder="TAGS (COMMA SEPARATED)" value={newTags} onChange={(e) => setNewTags(e.target.value)} className="w-full border-2 border-black p-3 font-black text-[10px] outline-none focus:ring-4 ring-yellow-400" />
                     <textarea placeholder="ARTIST NOTE" value={newDesc} onChange={(e) => setNewDesc(e.target.value)} className="w-full border-2 border-black p-3 h-24 font-bold text-[10px] outline-none focus:ring-4 ring-yellow-400" />
@@ -381,12 +418,28 @@ const AdminPortal: React.FC<AdminPortalProps> = ({
                 </div>
               </form>
             ) : (
-              <div className="p-10 text-center border-4 border-dashed border-blue-600 bg-blue-50">
-                <input type="file" multiple ref={bulkInputRef} onChange={(e) => setBulkFiles(Array.from(e.target.files || []))} className="hidden" accept="image/*" />
-                <button onClick={() => bulkInputRef.current?.click()} className="bg-white border-2 border-black px-8 py-4 font-black uppercase text-xs shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-                  {bulkFiles.length > 0 ? `${bulkFiles.length} FILES READY` : 'SELECT IMAGES'}
-                </button>
-                {bulkFiles.length > 0 && <button onClick={handleBulkUpload} className="block w-full mt-6 bg-blue-600 text-white border-2 border-black py-4 font-black uppercase text-xs">Start Mass Upload</button>}
+              <div className="space-y-6">
+                <div className="bg-slate-50 border-2 border-black p-6 space-y-4">
+                  <h3 className="text-xs font-black uppercase tracking-widest border-b border-black pb-2">Batch Settings</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-black uppercase opacity-60">Target Series</label>
+                      {folderSelectionUI}
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-black uppercase opacity-60">Common Tags</label>
+                      <input type="text" placeholder="TAGS (COMMA SEPARATED)" value={newTags} onChange={(e) => setNewTags(e.target.value)} className="w-full border-2 border-black p-3 font-black text-[10px] outline-none focus:ring-4 ring-yellow-400" />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-10 text-center border-4 border-dashed border-blue-600 bg-blue-50">
+                  <input type="file" multiple ref={bulkInputRef} onChange={(e) => setBulkFiles(Array.from(e.target.files || []))} className="hidden" accept="image/*" />
+                  <button onClick={() => bulkInputRef.current?.click()} className="bg-white border-2 border-black px-8 py-4 font-black uppercase text-xs shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+                    {bulkFiles.length > 0 ? `${bulkFiles.length} FILES READY` : 'SELECT IMAGES'}
+                  </button>
+                  {bulkFiles.length > 0 && <button onClick={handleBulkUpload} className="block w-full mt-6 bg-blue-600 text-white border-2 border-black py-4 font-black uppercase text-xs">Start Mass Upload</button>}
+                </div>
               </div>
             )}
           </div>
