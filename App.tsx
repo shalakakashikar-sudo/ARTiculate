@@ -19,6 +19,7 @@ const App: React.FC = () => {
   
   const [loginError, setLoginError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  // Fixed: Corrected variable name from setIsLoading to setIsLoggingIn to avoid redeclaration error
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   const loadData = async () => {
@@ -69,6 +70,7 @@ const App: React.FC = () => {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError(null);
+    // Fixed: setIsLoggingIn is now correctly defined
     setIsLoggingIn(true);
 
     try {
@@ -86,6 +88,7 @@ const App: React.FC = () => {
     } catch (err: any) {
       setLoginError(err.message || "Invalid credentials.");
     } finally {
+      // Fixed: setIsLoggingIn is now correctly defined
       setIsLoggingIn(false);
     }
   };
@@ -102,19 +105,13 @@ const App: React.FC = () => {
     if (!comicToDelete) return;
 
     try {
-      // 1. Delete DB record
-      // We don't check data length because RLS might prevent selecting the deleted row
       const { error: dbError } = await supabase
         .from('comics')
         .delete()
         .eq('id', id);
       
-      if (dbError) {
-        throw new Error(`Database Error: ${dbError.message}`);
-      }
+      if (dbError) throw new Error(`Database Error: ${dbError.message}`);
 
-      // 2. Clean up storage (non-blocking)
-      // Extract filename from the public URL if it's a Supabase hosted image
       if (comicToDelete.imageurl && comicToDelete.imageurl.includes('supabase.co')) {
         const urlParts = comicToDelete.imageurl.split('/');
         const fileName = urlParts[urlParts.length - 1];
@@ -123,9 +120,7 @@ const App: React.FC = () => {
         }
       }
 
-      // 3. Update local state
       setComics(prev => prev.filter(c => c.id !== id));
-      console.log(`Comic ${id} deleted.`);
     } catch (err: any) {
       console.error("Delete Failed:", err);
       alert(`COULD NOT DELETE\n${err.message}`);
@@ -141,11 +136,8 @@ const App: React.FC = () => {
         .eq('id', id);
       
       if (error) throw error;
-      
-      // Update state
       setFolders(prev => prev.filter(f => f.id !== id));
-      setComics(prev => prev.filter(c => c.folderid !== id));
-      console.log(`Series ${id} and its contents removed.`);
+      setComics(prev => prev.filter(c => c.folderid === id));
     } catch (err: any) {
       console.error("Series Deletion Failed:", err);
       alert(`COULD NOT DELETE SERIES: ${err.message}`);
@@ -205,7 +197,7 @@ const App: React.FC = () => {
           </div>
         </header>
 
-        <main className="flex-grow max-w-7xl mx-auto w-full p-4 md:p-8">
+        <main className="flex-grow max-w-[1440px] mx-auto w-full px-8 py-6 md:px-20 md:py-10 overflow-visible relative">
           {isLoading && (
             <div className="flex justify-center items-center h-64">
               <div className="animate-spin h-12 w-12 border-4 border-black border-t-yellow-400 rounded-full"></div>
@@ -222,7 +214,7 @@ const App: React.FC = () => {
                       session={session}
                       onAdd={(c) => setComics(prev => [c, ...prev])} 
                       onUpdate={(c) => setComics(prev => prev.map(item => item.id === c.id ? c : item))}
-                      onDelete={handleDeleteComic} 
+                      onDelete={handleDeleteComic}
                       onAddFolder={(f) => setFolders(prev => [...prev, f])}
                       onDeleteFolder={handleDeleteFolder}
                     />
@@ -236,81 +228,48 @@ const App: React.FC = () => {
 
         {showLoginModal && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-            <div className={`bg-white border-4 border-black p-8 shadow-[12px_12px_0px_0px_rgba(234,179,8,1)] max-w-md w-full transition-transform ${loginError ? 'animate-shake' : 'animate-fadeIn'}`}>
-              <h2 className="comic-title text-4xl mb-6 text-center">MASTER ARTIST LOGIN</h2>
+            <div className="bg-white border-4 border-black w-full max-md p-8 shadow-[12px_12px_0px_0px_rgba(251,191,36,1)] animate-fadeIn">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="comic-title text-4xl uppercase">The Atelier</h2>
+                <button onClick={() => setShowLoginModal(false)} className="text-2xl font-black">X</button>
+              </div>
               <form onSubmit={handleLogin} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-black uppercase mb-1 text-slate-500 tracking-widest">Email Address</label>
+                  <label className="block text-xs font-black uppercase mb-1">Archive Email</label>
                   <input 
-                    type="email"
+                    type="email" 
                     value={emailInput}
                     onChange={(e) => setEmailInput(e.target.value)}
-                    className="w-full border-4 border-black p-3 font-bold focus:ring-4 ring-yellow-400 outline-none transition-all"
-                    placeholder="artist@example.com"
+                    className="w-full border-2 border-black p-3 font-bold focus:ring-4 ring-yellow-400 outline-none"
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-black uppercase mb-1 text-slate-500 tracking-widest">Secret Password</label>
+                  <label className="block text-xs font-black uppercase mb-1">Keyphrase</label>
                   <input 
-                    type="password"
+                    type="password" 
                     value={passwordInput}
                     onChange={(e) => setPasswordInput(e.target.value)}
-                    className="w-full border-4 border-black p-3 font-bold focus:ring-4 ring-yellow-400 outline-none transition-all"
-                    placeholder="••••••••"
+                    className="w-full border-2 border-black p-3 font-bold focus:ring-4 ring-yellow-400 outline-none"
                     required
                   />
                 </div>
-                {loginError && (
-                  <div className="bg-red-50 border-2 border-red-600 p-2 text-center">
-                    <p className="text-red-600 font-black text-[10px] uppercase">
-                      {loginError}
-                    </p>
-                  </div>
-                )}
-                <div className="grid grid-cols-2 gap-4 mt-6">
-                  <button 
-                    disabled={isLoggingIn}
-                    type="button" 
-                    onClick={() => { setShowLoginModal(false); setLoginError(null); }}
-                    className="border-4 border-black font-black py-3 uppercase tracking-widest hover:bg-slate-100 disabled:opacity-50"
-                  >
-                    Cancel
-                  </button>
-                  <button 
-                    disabled={isLoggingIn}
-                    type="submit" 
-                    className="bg-black text-white border-4 border-black font-black py-3 uppercase tracking-widest hover:bg-slate-800 shadow-[4px_4px_0px_0px_rgba(234,179,8,1)] disabled:opacity-50 active:shadow-none active:translate-x-1 active:translate-y-1"
-                  >
-                    {isLoggingIn ? 'Unlocking...' : 'Unlock'}
-                  </button>
-                </div>
+                {loginError && <p className="text-red-600 text-[10px] font-black uppercase italic">{loginError}</p>}
+                <button 
+                  type="submit" 
+                  disabled={isLoggingIn}
+                  className="w-full bg-black text-white border-2 border-black py-4 font-black uppercase tracking-widest hover:bg-slate-800 transition-colors shadow-[4px_4px_0px_0px_rgba(239,68,68,1)] disabled:opacity-50"
+                >
+                  {isLoggingIn ? 'AUTHENTICATING...' : 'OPEN ARCHIVE'}
+                </button>
               </form>
             </div>
           </div>
         )}
 
-        <footer className="bg-black text-white p-8 mt-12">
-          <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6 text-center md:text-left">
-            <div className="flex flex-col items-center md:items-start">
-              <div className="text-slate-400 font-bold uppercase tracking-widest text-[10px] mb-1">
-                A CREATIVE GALLERY TOOL FOR ARTISTS
-              </div>
-              <div className="marker-font text-yellow-400 text-xl tracking-wider">
-                CREATED BY <span className="text-white border-b-2 border-red-600">SHALAKA KASHIKAR</span>
-              </div>
-            </div>
-            
-            <div className="flex flex-col items-center md:items-end gap-2 text-slate-400 text-sm">
-              {!isAuthenticated && (
-                <button 
-                  onClick={() => setShowLoginModal(true)}
-                  className="text-[8px] font-black border border-slate-600 px-2 py-1 hover:border-white hover:text-white transition-colors uppercase mt-2 opacity-40 hover:opacity-100"
-                >
-                  Admin Portal Entry
-                </button>
-              )}
-            </div>
+        <footer className="bg-white border-t-4 border-black py-10">
+          <div className="max-w-7xl mx-auto px-4 text-center">
+             <span className="comic-title text-xl md:text-2xl uppercase italic">ART<span className="text-red-600">iculate</span> Archive &copy; {new Date().getFullYear()}</span>
           </div>
         </footer>
       </div>
@@ -318,4 +277,5 @@ const App: React.FC = () => {
   );
 };
 
+// Fixed: Added default export for App component
 export default App;

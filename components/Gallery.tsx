@@ -12,22 +12,22 @@ const GalleryCard: React.FC<{ comic: ComicEntry }> = ({ comic }) => {
   const displayUrl = comic.thumbnailurl || (comic.mimetype.startsWith('image/') ? comic.imageurl : null);
 
   return (
-    /* p-4 provides a 16px safety buffer around the card, 
-       ensuring the 10px pop-shadow is never clipped by column boundaries. */
-    <div className="break-inside-avoid mb-2 p-4">
+    /* Wrapper with generous padding to contain the 10px pop-shadow */
+    <div className="p-4 md:p-6 overflow-visible">
       <Link 
         to={`/comic/${comic.id}`}
-        className="group block bg-white border-[3px] border-black p-2 transition-all duration-300 hover:-translate-y-2 hover:shadow-[10px_10px_0px_0px_rgba(0,0,0,1)]"
+        className="group block bg-white border-[3px] border-black p-2 transition-all duration-300 hover:-translate-y-2 hover:shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] transform-gpu"
+        style={{ backfaceVisibility: 'hidden' }}
         title={comic.title}
       >
         <div className="relative flex flex-col h-full overflow-hidden">
           {/* Dynamic Image Container */}
-          <div className="relative bg-slate-100 flex items-center justify-center overflow-hidden halftone-overlay border-b-[3px] border-black">
+          <div className="relative bg-slate-100 flex items-center justify-center overflow-hidden halftone-overlay border-b-[3px] border-black aspect-square md:aspect-auto">
             {displayUrl ? (
               <img 
                 src={displayUrl} 
                 alt={comic.title} 
-                className="w-full h-auto object-cover prevent-save transition-transform duration-700 group-hover:scale-105"
+                className="w-full h-full object-cover prevent-save transition-transform duration-700 group-hover:scale-105"
                 onContextMenu={(e) => e.preventDefault()}
               />
             ) : (
@@ -90,7 +90,7 @@ const Gallery: React.FC<GalleryProps> = ({ comics, folders }) => {
   const activeFolder = folders.find(f => f.id === activeFolderId);
 
   return (
-    <div className="flex flex-col lg:flex-row gap-10 animate-fadeIn">
+    <div className="flex flex-col lg:flex-row gap-10 animate-fadeIn overflow-visible">
       {/* Sidebar Navigation */}
       <aside className="lg:w-72 flex-shrink-0 space-y-8">
         
@@ -155,8 +155,8 @@ const Gallery: React.FC<GalleryProps> = ({ comics, folders }) => {
         </div>
       </aside>
 
-      {/* Main Area - Masonry Columns */}
-      <div className="flex-grow">
+      {/* Main Area - Strict 2-Column Grid for maximum stability */}
+      <div className="flex-grow overflow-visible pr-8">
         {activeFolder && (
           <div className="mb-8 bg-white border-[3px] border-black p-6 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]">
             <h1 className="comic-title text-4xl text-blue-600 uppercase leading-none">{activeFolder.name}</h1>
@@ -183,9 +183,8 @@ const Gallery: React.FC<GalleryProps> = ({ comics, folders }) => {
             <h2 className="comic-title text-5xl uppercase italic tracking-tighter">The Void</h2>
           </div>
         ) : (
-          /* px-6 ensures a solid margin from the extreme edges of the container. 
-             gap-2 keeps the columns distinct while allowing pop-shadows room inside the p-4 card wrapper. */
-          <div className="px-6 columns-2 sm:columns-2 md:columns-3 lg:columns-4 xl:columns-5 gap-2 pb-10">
+          /* Forcing 2 columns as requested. gap-2 md:gap-6 adds space between panels. */
+          <div className="grid grid-cols-2 gap-2 md:gap-6 pb-10 overflow-visible">
             {filteredComics.map((comic) => (
               <GalleryCard key={comic.id} comic={comic} />
             ))}

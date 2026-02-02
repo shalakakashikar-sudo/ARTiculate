@@ -14,7 +14,7 @@ interface AdminPortalProps {
   onDeleteFolder: (id: string) => void;
 }
 
-type PublishStep = 'idle' | 'uploading-file' | 'uploading-thumb' | 'saving-db' | 'success' | 'error' | 'batch-processing';
+type PublishStep = 'idle' | 'optimizing-color' | 'uploading-file' | 'uploading-thumb' | 'saving-db' | 'success' | 'error' | 'batch-processing';
 
 const AdminPortal: React.FC<AdminPortalProps> = ({ 
   comics, 
@@ -51,6 +51,38 @@ const AdminPortal: React.FC<AdminPortalProps> = ({
   const [validationError, setValidationError] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const bulkInputRef = useRef<HTMLInputElement>(null);
+
+  /**
+   * Automatic Color Correction Logic:
+   * Re-draws the image to a canvas and exports it. 
+   * Browsers default to sRGB when drawing to canvas, effectively "washing" away CMYK profiles.
+   */
+  const sanitizeImageFile = async (file: File): Promise<File | Blob> => {
+    if (!file.type.startsWith('image/')) return file;
+    
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { resolve(file); return; }
+        
+        ctx.drawImage(img, 0, 0);
+        // Exporting as JPEG at high quality strips CMYK profiles and embeds standard sRGB
+        canvas.toBlob((blob) => {
+          if (blob) {
+            resolve(new File([blob], file.name, { type: 'image/jpeg' }));
+          } else {
+            resolve(file);
+          }
+        }, 'image/jpeg', 0.95);
+      };
+      img.onerror = () => resolve(file);
+      img.src = URL.createObjectURL(file);
+    });
+  };
 
   const filteredArchives = useMemo(() => {
     return comics.filter(c => 
@@ -105,7 +137,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({
       return;
     }
 
-    setPublishStep('uploading-file');
+    setPublishStep('optimizing-color');
     const tempId = Date.now().toString();
 
     try {
@@ -128,11 +160,16 @@ const AdminPortal: React.FC<AdminPortalProps> = ({
 
       let imageUrl = previewUrl || '';
       let thumbnailUrl = thumbPreviewUrl || null;
+      let finalFile: File | Blob | null = fileObject;
 
       if (fileObject) {
+        // Run auto-correction
+        finalFile = await sanitizeImageFile(fileObject);
+        
+        setPublishStep('uploading-file');
         const fileExt = fileObject.name.split('.').pop();
         const fileName = `${tempId}-main.${fileExt}`;
-        const { error: fileError } = await supabase.storage.from('comics').upload(fileName, fileObject);
+        const { error: fileError } = await supabase.storage.from('comics').upload(fileName, finalFile);
         if (fileError) throw fileError;
         const { data: { publicUrl } } = supabase.storage.from('comics').getPublicUrl(fileName);
         imageUrl = publicUrl;
@@ -197,7 +234,10 @@ const AdminPortal: React.FC<AdminPortalProps> = ({
         const fileExt = file.name.split('.').pop();
         const fileName = `${tempId}-bulk.${fileExt}`;
         
-        const { error: storageError } = await supabase.storage.from('comics').upload(fileName, file);
+        // Auto-correct each bulk item
+        const finalFile = await sanitizeImageFile(file);
+        
+        const { error: storageError } = await supabase.storage.from('comics').upload(fileName, finalFile);
         if (storageError) continue;
         
         const { data: { publicUrl } } = supabase.storage.from('comics').getPublicUrl(fileName);
@@ -285,6 +325,9 @@ const AdminPortal: React.FC<AdminPortalProps> = ({
                 ) : (
                   <div className="animate-pulse space-y-4">
                      <h2 className="comic-title text-3xl uppercase">{publishStep.replace('-', ' ')}...</h2>
+                     {publishStep === 'optimizing-color' && (
+                       <p className="text-[10px] font-black uppercase opacity-60">Stripping Print Profiles & Correcting sRGB</p>
+                     )}
                   </div>
                 )}
               </div>
@@ -425,14 +468,13 @@ const AdminPortal: React.FC<AdminPortalProps> = ({
           <div className="bg-yellow-100 border-2 border-dashed border-black p-4 tilt-sm shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] relative">
             <h3 className="comic-title text-lg uppercase mb-2 text-red-600">Artist's Studio Note</h3>
             <p className="text-[10px] font-bold leading-tight uppercase italic opacity-80 mb-3">
-              Seeing color shifts in your PDFs? Web browsers prefer <span className="underline">sRGB</span>. 
-              Avoid <span className="underline">CMYK</span> exports to ensure your art looks exactly as intended!
+              Seeing color shifts in your PDFs? The Atelier now <span className="underline">automatically corrects</span> images to sRGB during upload! 🎨
             </p>
             <button 
               onClick={() => setShowExportGuide(true)}
               className="w-full bg-black text-white text-[8px] font-black uppercase py-2 tracking-widest hover:bg-slate-800 transition-colors"
             >
-              How to Export Correcty →
+              How it works →
             </button>
           </div>
 
@@ -510,36 +552,27 @@ const AdminPortal: React.FC<AdminPortalProps> = ({
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/90 p-4">
           <div className="bg-white border-4 border-black max-w-2xl w-full p-8 shadow-[12px_12px_0px_0px_rgba(239,68,68,1)] overflow-y-auto max-h-[90vh] animate-fadeIn">
              <div className="flex justify-between items-start mb-6 border-b-4 border-black pb-4">
-               <h2 className="comic-title text-4xl uppercase">sRGB Export Guide</h2>
+               <h2 className="comic-title text-4xl uppercase">Artist Optimization</h2>
                <button onClick={() => setShowExportGuide(false)} className="bg-black text-white px-3 py-1 font-black text-xl border-2 border-black hover:bg-red-600 transition-colors">X</button>
              </div>
              
              <div className="space-y-8">
                 <section>
-                  <h3 className="font-black text-xs uppercase bg-yellow-400 inline-block px-2 py-1 border border-black mb-3">Clip Studio Paint</h3>
+                  <h3 className="font-black text-xs uppercase bg-yellow-400 inline-block px-2 py-1 border border-black mb-3">Automatic Correction</h3>
                   <p className="text-[10px] font-bold uppercase leading-relaxed text-slate-600">
-                    File > Export (Single Layer) > .pdf <br/>
-                    In the dialog: Set <span className="text-black underline">Expression Color</span> to <span className="text-black">RGB</span> and ensure <span className="text-black underline">Embed Color Profile</span> is CHECKED.
+                    When you upload an image, The Atelier renders it onto a virtual canvas. This "baking" process strips hidden CMYK profiles and converts colors to the browser-native <span className="text-black underline">sRGB</span>.
                   </p>
                 </section>
 
                 <section>
-                  <h3 className="font-black text-xs uppercase bg-blue-400 text-white inline-block px-2 py-1 border border-black mb-3">Adobe Photoshop</h3>
+                  <h3 className="font-black text-xs uppercase bg-blue-400 text-white inline-block px-2 py-1 border border-black mb-3">PDF Recommendation</h3>
                   <p className="text-[10px] font-bold uppercase leading-relaxed text-slate-600">
-                    File > Save As > Photoshop PDF <br/>
-                    In the dialog: Select <span className="text-black">Output</span> on left > Set Color Conversion to <span className="text-black">Convert to Destination</span> > Destination: <span className="text-black">sRGB IEC61966-2.1</span>.
-                  </p>
-                </section>
-
-                <section>
-                  <h3 className="font-black text-xs uppercase bg-red-600 text-white inline-block px-2 py-1 border border-black mb-3">Procreate (iPad)</h3>
-                  <p className="text-[10px] font-bold uppercase leading-relaxed text-slate-600">
-                    PDFs inherit the canvas profile. Always start your canvas with an <span className="text-black underline">sRGB Color Profile</span>. If your colors look dull, copy layers to a new sRGB canvas before exporting.
+                    While we optimize images, PDF color management is locked into the file. For perfect results, always export your PDFs using <span className="text-black">sRGB IEC61966-2.1</span> from Photoshop or CSP.
                   </p>
                 </section>
 
                 <div className="bg-slate-100 p-4 border-2 border-black italic">
-                   <p className="text-[9px] font-black uppercase text-center">Browsers are built for LIGHT (RGB), not INK (CMYK). <br/> Using sRGB ensures your digital art stays consistent everywhere.</p>
+                   <p className="text-[9px] font-black uppercase text-center">We treat your art with the respect it deserves, <br/> ensuring it looks exactly as you drew it.</p>
                 </div>
              </div>
 
@@ -547,7 +580,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({
                onClick={() => setShowExportGuide(false)}
                className="w-full mt-8 bg-black text-white py-4 font-black uppercase tracking-widest border-2 border-black hover:bg-slate-800 transition-colors"
              >
-               Got it, Master Artist!
+               Understood!
              </button>
           </div>
         </div>
