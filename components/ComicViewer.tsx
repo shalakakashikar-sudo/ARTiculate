@@ -28,9 +28,9 @@ const ComicViewer: React.FC<ComicViewerProps> = ({ comics }) => {
   }, [id, comics]);
 
   /**
-   * High-Fidelity PDF Multi-Page Renderer
-   * Renders every page of the chronicle to a color-safe sRGB JPEG
-   * using a "white foundation" pass to guarantee original artist colors.
+   * Ultra-High-Fidelity PDF Multi-Page Renderer
+   * Renders every page at 4.0x scale (High-DPI optimized)
+   * Uses a white-foundation pass and 'print' intent for maximum vibrancy.
    */
   const renderPdfChronicle = useCallback(async (url: string) => {
     const pdfjsLib = (window as any).pdfjsLib;
@@ -45,30 +45,35 @@ const ComicViewer: React.FC<ComicViewerProps> = ({ comics }) => {
       // Loop through all pages to ensure the "Full Chronicle" is visible
       for (let i = 1; i <= pagesCount; i++) {
         const page = await pdf.getPage(i);
-        const viewport = page.getViewport({ scale: 2.5 }); // High-resolution render scale
+        // Scale 4.0 provides exceptional detail for both text and ink lines
+        const viewport = page.getViewport({ scale: 4.0 }); 
         const canvas = document.createElement('canvas');
-        const context = canvas.getContext('2d', { alpha: false });
+        const context = canvas.getContext('2d', { 
+          alpha: false,
+          willReadFrequently: false 
+        });
         
         if (context) {
           canvas.height = viewport.height;
           canvas.width = viewport.width;
 
-          // COLOR FIX: Fill with solid white first to fix CMYK transparency issues
+          // COLOR FOUNDATION: Fill with pure white to ensure colors don't look muddy
           context.fillStyle = '#FFFFFF';
           context.fillRect(0, 0, canvas.width, canvas.height);
 
           await page.render({ 
             canvasContext: context, 
             viewport: viewport,
-            intent: 'display' // Optimize for screen color accuracy
+            intent: 'print' // 'print' intent often results in more accurate and vibrant color reproduction
           }).promise;
           
-          renderedPages.push(canvas.toDataURL('image/jpeg', 0.92));
+          // 0.98 quality provides near-lossless clarity and vibrancy
+          renderedPages.push(canvas.toDataURL('image/jpeg', 0.98));
         }
       }
       setPdfPages(renderedPages);
     } catch (err) {
-      console.error("PDF Rendering Failed:", err);
+      console.error("High-Def PDF Rendering Failed:", err);
     } finally {
       setLoadingPdf(false);
     }
@@ -122,7 +127,7 @@ const ComicViewer: React.FC<ComicViewerProps> = ({ comics }) => {
           </h1>
           {isPdf && (
             <span className="text-[10px] md:text-xs font-black bg-blue-600 text-white px-4 py-1.5 uppercase shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] tracking-widest inline-block">
-              Full Multi-Page Chronicle
+              Full Ultra-HD Chronicle
             </span>
           )}
         </header>
@@ -133,7 +138,7 @@ const ComicViewer: React.FC<ComicViewerProps> = ({ comics }) => {
               {loadingPdf ? (
                 <div className="py-60 text-center bg-slate-50 border-2 border-black border-dashed">
                   <div className="animate-spin h-12 w-12 border-4 border-black border-t-red-600 rounded-full mx-auto mb-6"></div>
-                  <p className="comic-title text-2xl uppercase italic">Processing High-Def Pages...</p>
+                  <p className="comic-title text-2xl uppercase italic">Rendering in Ultra-HD...</p>
                 </div>
               ) : (
                 <div className="flex flex-col gap-12">
@@ -142,7 +147,8 @@ const ComicViewer: React.FC<ComicViewerProps> = ({ comics }) => {
                       <img 
                         src={pageUrl} 
                         alt={`${comic.title} - Page ${idx + 1}`} 
-                        className="w-full h-auto prevent-save block"
+                        className="w-full h-auto prevent-save block contrast-[1.04] brightness-[1.01]"
+                        style={{ imageRendering: 'high-quality' }}
                         onContextMenu={(e) => e.preventDefault()}
                       />
                       <div className="bg-slate-50 border-t-2 border-black p-3 text-right">
@@ -158,7 +164,8 @@ const ComicViewer: React.FC<ComicViewerProps> = ({ comics }) => {
               <img 
                 src={comic.imageurl} 
                 alt={comic.title} 
-                className="w-full h-auto prevent-save block"
+                className="w-full h-auto prevent-save block contrast-[1.04] brightness-[1.01]"
+                style={{ imageRendering: 'high-quality' }}
                 onContextMenu={(e) => e.preventDefault()}
               />
             </div>
