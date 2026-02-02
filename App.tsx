@@ -19,7 +19,6 @@ const App: React.FC = () => {
   
   const [loginError, setLoginError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  // Fixed: Corrected variable name from setIsLoading to setIsLoggingIn to avoid redeclaration error
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   const loadData = async () => {
@@ -70,7 +69,6 @@ const App: React.FC = () => {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError(null);
-    // Fixed: setIsLoggingIn is now correctly defined
     setIsLoggingIn(true);
 
     try {
@@ -88,7 +86,6 @@ const App: React.FC = () => {
     } catch (err: any) {
       setLoginError(err.message || "Invalid credentials.");
     } finally {
-      // Fixed: setIsLoggingIn is now correctly defined
       setIsLoggingIn(false);
     }
   };
@@ -150,18 +147,19 @@ const App: React.FC = () => {
     <HashRouter>
       <div className="min-h-screen flex flex-col">
         <header className="sticky top-0 z-50 bg-yellow-400 border-b-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-          <div className="max-w-7xl mx-auto px-4 h-20 flex items-center justify-between">
-            <Link to="/" className="flex items-center gap-3" onClick={() => setViewMode(ViewMode.VIEWER)}>
+          <div className="max-w-7xl mx-auto px-4 h-24 md:h-20 flex items-center justify-between">
+            <Link to="/" className="flex flex-col md:flex-row md:items-end gap-1 md:gap-3" onClick={() => setViewMode(ViewMode.VIEWER)}>
               <div className="bg-white border-2 border-black p-1 rotate-[-2deg] shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:rotate-0 transition-transform">
-                <span className="comic-title text-3xl font-black text-black px-2">ART<span className="text-red-600">iculate</span></span>
+                <span className="comic-title text-2xl md:text-3xl font-black text-black px-2">ART<span className="text-red-600">iculate</span></span>
               </div>
+              <span className="marker-font text-[9px] md:text-[10px] uppercase text-slate-800 font-bold mb-1 opacity-60">by Shalaka Kashikar</span>
             </Link>
 
             <nav className="flex items-center gap-2 md:gap-4">
               <Link 
                 to="/" 
                 onClick={() => setViewMode(ViewMode.VIEWER)} 
-                className={`text-[10px] md:text-sm font-bold border-2 border-black px-4 py-2 transition-colors uppercase tracking-tight ${
+                className={`text-[9px] md:text-xs font-bold border-2 border-black px-3 py-2 transition-all uppercase tracking-tight ${
                   viewMode === ViewMode.VIEWER ? 'bg-black text-white' : 'bg-white text-black hover:bg-slate-50'
                 }`}
               >
@@ -172,15 +170,15 @@ const App: React.FC = () => {
                 <>
                   <button 
                     onClick={() => setViewMode(prev => prev === ViewMode.ADMIN ? ViewMode.VIEWER : ViewMode.ADMIN)}
-                    className={`text-[10px] md:text-sm font-bold border-2 border-black px-4 py-2 transition-colors uppercase tracking-tight ${
+                    className={`text-[9px] md:text-xs font-bold border-2 border-black px-3 py-2 transition-all uppercase tracking-tight ${
                       viewMode === ViewMode.ADMIN ? 'bg-blue-600 text-white shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]' : 'bg-white text-black hover:bg-slate-50'
                     }`}
                   >
-                    {viewMode === ViewMode.ADMIN ? 'Previewing' : 'The Atelier'}
+                    {viewMode === ViewMode.ADMIN ? 'Previewing' : 'Atelier'}
                   </button>
                   <button 
                     onClick={handleLogout} 
-                    className="text-[10px] md:text-sm font-bold border-2 border-black bg-white px-4 py-2 hover:bg-red-500 hover:text-white transition-colors uppercase tracking-tight"
+                    className="text-[9px] md:text-xs font-bold border-2 border-black bg-white px-3 py-2 hover:bg-red-500 hover:text-white transition-all uppercase tracking-tight"
                   >
                     Logout
                   </button>
@@ -188,7 +186,7 @@ const App: React.FC = () => {
               ) : (
                 <button 
                   onClick={() => setShowLoginModal(true)}
-                  className="text-[10px] md:text-sm font-bold bg-black text-white border-2 border-black px-4 py-2 hover:bg-slate-800 transition-colors uppercase tracking-tight shadow-[3px_3px_0px_0px_rgba(239,68,68,1)] active:shadow-none active:translate-x-0.5 active:translate-y-0.5"
+                  className="text-[9px] md:text-xs font-bold bg-black text-white border-2 border-black px-3 py-2 hover:bg-slate-800 transition-all uppercase tracking-tight shadow-[2px_2px_0px_0px_rgba(239,68,68,1)] active:shadow-none"
                 >
                   Enter Atelier
                 </button>
@@ -228,7 +226,7 @@ const App: React.FC = () => {
 
         {showLoginModal && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-            <div className="bg-white border-4 border-black w-full max-md p-8 shadow-[12px_12px_0px_0px_rgba(251,191,36,1)] animate-fadeIn">
+            <div className="bg-white border-4 border-black w-full max-w-md p-8 shadow-[12px_12px_0px_0px_rgba(251,191,36,1)] animate-fadeIn">
               <div className="flex justify-between items-center mb-6">
                 <h2 className="comic-title text-4xl uppercase">The Atelier</h2>
                 <button onClick={() => setShowLoginModal(false)} className="text-2xl font-black">X</button>
@@ -267,9 +265,14 @@ const App: React.FC = () => {
           </div>
         )}
 
-        <footer className="bg-white border-t-4 border-black py-10">
-          <div className="max-w-7xl mx-auto px-4 text-center">
-             <span className="comic-title text-xl md:text-2xl uppercase italic">ART<span className="text-red-600">iculate</span> Archive &copy; {new Date().getFullYear()}</span>
+        <footer className="bg-white border-t-4 border-black py-12">
+          <div className="max-w-7xl mx-auto px-4 text-center space-y-3">
+             <div className="comic-title text-xl md:text-3xl uppercase italic tracking-tight">
+               ART<span className="text-red-600">iculate</span> Archive &copy; {new Date().getFullYear()}
+             </div>
+             <div className="marker-font text-xs md:text-sm text-slate-500 uppercase tracking-tighter">
+               Brought to life by <span className="text-black font-black underline decoration-red-600 decoration-2 underline-offset-4">Shalaka Kashikar</span>
+             </div>
           </div>
         </footer>
       </div>
@@ -277,5 +280,4 @@ const App: React.FC = () => {
   );
 };
 
-// Fixed: Added default export for App component
 export default App;
