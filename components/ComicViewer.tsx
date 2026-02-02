@@ -105,7 +105,7 @@ const ComicViewer: React.FC<ComicViewerProps> = ({ comics }) => {
   const nextComic = currentIndex > 0 ? comics[currentIndex - 1] : null;
 
   return (
-    <div className="max-w-4xl mx-auto animate-fadeIn mb-24">
+    <div className="max-w-[1200px] mx-auto animate-fadeIn mb-24 px-4 md:px-0">
       <div className="flex justify-between items-center mb-6">
         <Link to="/" className="text-sm font-bold text-slate-600 hover:text-black flex items-center gap-2">
           ← BACK TO FEED
@@ -115,38 +115,38 @@ const ComicViewer: React.FC<ComicViewerProps> = ({ comics }) => {
         </div>
       </div>
 
-      <div className="bg-white border-4 border-black p-2 md:p-6 shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] relative">
-        <header className="mb-6 text-center border-b-4 border-black pb-4">
-          <h1 className="comic-title text-4xl md:text-6xl mb-2 italic">
+      <div className="bg-white border-4 border-black p-1 md:p-8 shadow-[16px_16px_0px_0px_rgba(0,0,0,1)] relative">
+        <header className="mb-8 text-center border-b-4 border-black pb-6">
+          <h1 className="comic-title text-5xl md:text-8xl mb-3 italic leading-tight">
             {comic.title}
           </h1>
           {isPdf && (
-            <span className="text-[10px] font-black bg-blue-600 text-white px-3 py-1 uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] tracking-widest">
+            <span className="text-[10px] md:text-xs font-black bg-blue-600 text-white px-4 py-1.5 uppercase shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] tracking-widest inline-block">
               Full Multi-Page Chronicle
             </span>
           )}
         </header>
 
-        <div className="space-y-6 mb-10">
+        <div className="space-y-10 mb-12">
           {isPdf ? (
             <>
               {loadingPdf ? (
-                <div className="py-40 text-center bg-slate-50 border-2 border-black border-dashed">
-                  <div className="animate-spin h-10 w-10 border-4 border-black border-t-red-600 rounded-full mx-auto mb-4"></div>
-                  <p className="comic-title text-xl uppercase italic">Fixing original colours for web...</p>
+                <div className="py-60 text-center bg-slate-50 border-2 border-black border-dashed">
+                  <div className="animate-spin h-12 w-12 border-4 border-black border-t-red-600 rounded-full mx-auto mb-6"></div>
+                  <p className="comic-title text-2xl uppercase italic">Processing High-Def Pages...</p>
                 </div>
               ) : (
-                <div className="flex flex-col gap-8">
+                <div className="flex flex-col gap-12">
                   {pdfPages.map((pageUrl, idx) => (
-                    <div key={idx} className="bg-white border-2 border-black overflow-hidden shadow-[6px_6px_0px_0px_rgba(0,0,0,0.05)]">
+                    <div key={idx} className="bg-white border-[3px] border-black overflow-hidden shadow-[10px_10px_0px_0px_rgba(0,0,0,0.05)]">
                       <img 
                         src={pageUrl} 
                         alt={`${comic.title} - Page ${idx + 1}`} 
-                        className="w-full h-auto prevent-save"
+                        className="w-full h-auto prevent-save block"
                         onContextMenu={(e) => e.preventDefault()}
                       />
-                      <div className="bg-slate-50 border-t border-black p-2 text-right">
-                         <span className="text-[8px] font-black uppercase opacity-40">Page {idx + 1} of {pdfPages.length}</span>
+                      <div className="bg-slate-50 border-t-2 border-black p-3 text-right">
+                         <span className="text-[10px] font-black uppercase opacity-40">Section {idx + 1} of {pdfPages.length}</span>
                       </div>
                     </div>
                   ))}
@@ -154,55 +154,55 @@ const ComicViewer: React.FC<ComicViewerProps> = ({ comics }) => {
               )}
             </>
           ) : (
-            <div className="bg-slate-50 border-2 border-black overflow-hidden shadow-[6px_6px_0px_0px_rgba(0,0,0,0.05)]">
+            <div className="bg-white border-[3px] border-black overflow-hidden shadow-[10px_10px_0px_0px_rgba(0,0,0,0.08)]">
               <img 
                 src={comic.imageurl} 
                 alt={comic.title} 
-                className="w-full h-auto prevent-save"
+                className="w-full h-auto prevent-save block"
                 onContextMenu={(e) => e.preventDefault()}
               />
             </div>
           )}
         </div>
 
-        <div className="prose max-w-none px-4">
-          <div className="marker-font text-2xl text-blue-600 mb-2">Notes from the Artist</div>
-          <p className="text-lg text-slate-700 leading-relaxed font-medium mb-6 italic">
+        <div className="prose max-w-4xl mx-auto px-4 md:px-0">
+          <div className="marker-font text-3xl text-blue-600 mb-4">Notes from the Artist</div>
+          <p className="text-xl md:text-2xl text-slate-800 leading-relaxed font-medium mb-10 italic">
             "{comic.description}"
           </p>
-          <div className="flex flex-wrap gap-2 mb-8">
+          <div className="flex flex-wrap gap-3 mb-12">
             {comic.tags.map(tag => (
-              <span key={tag} className="text-[10px] font-black bg-yellow-400 border border-black px-3 py-1.5 uppercase shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">#{tag}</span>
+              <span key={tag} className="text-xs font-black bg-yellow-400 border-2 border-black px-4 py-2 uppercase shadow-[3px_3px_0px_0px_rgba(0,0,0,1)]">#{tag}</span>
             ))}
           </div>
         </div>
 
-        <div className="flex flex-col md:flex-row gap-4 justify-center items-center py-8 border-t-4 border-black mb-8">
+        <div className="flex flex-col md:flex-row gap-6 justify-center items-center py-10 border-t-4 border-black mb-10">
           {isPdf && (
             <button 
               onClick={openFullContent}
-              className="bg-black text-white border-4 border-black px-10 py-4 font-black uppercase tracking-tighter text-sm shadow-[6px_6px_0px_0px_rgba(239,68,68,1)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[4px_4px_0px_0px_rgba(239,68,68,1)] active:shadow-none transition-all"
+              className="bg-black text-white border-4 border-black px-12 py-5 font-black uppercase tracking-tighter text-base shadow-[8px_8px_0px_0px_rgba(239,68,68,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[6px_6px_0px_0px_rgba(239,68,68,1)] active:shadow-none transition-all"
             >
               Open Original PDF File
             </button>
           )}
         </div>
 
-        <div className="pt-8 border-t-2 border-black border-dashed flex items-center justify-center gap-6">
+        <div className="pt-10 border-t-2 border-black border-dashed flex items-center justify-center gap-10">
           <button 
             disabled={!prevComic}
             onClick={() => navigate(`/comic/${prevComic?.id}`)}
-            className="bg-white border-2 border-black px-8 py-3 font-black uppercase tracking-tighter hover:bg-black hover:text-white disabled:opacity-30 transition-all flex items-center gap-2"
+            className="bg-white border-2 border-black px-10 py-4 font-black uppercase tracking-tighter hover:bg-black hover:text-white disabled:opacity-30 transition-all flex items-center gap-3 text-sm"
           >
-            ← PREV
+            ← PREV STRIP
           </button>
-          <div className="h-10 w-1 bg-black hidden md:block"></div>
+          <div className="h-12 w-1.5 bg-black hidden md:block"></div>
           <button 
             disabled={!nextComic}
             onClick={() => navigate(`/comic/${nextComic?.id}`)}
-            className="bg-white border-2 border-black px-8 py-3 font-black uppercase tracking-tighter hover:bg-black hover:text-white disabled:opacity-30 transition-all flex items-center gap-2"
+            className="bg-white border-2 border-black px-10 py-4 font-black uppercase tracking-tighter hover:bg-black hover:text-white disabled:opacity-30 transition-all flex items-center gap-3 text-sm"
           >
-            NEXT →
+            NEXT STRIP →
           </button>
         </div>
       </div>
