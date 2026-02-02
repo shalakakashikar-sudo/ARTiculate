@@ -406,7 +406,10 @@ const AdminPortal: React.FC<AdminPortalProps> = ({
                   <div className="space-y-4">
                     <input type="text" placeholder="TITLE" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} className="w-full border-2 border-black p-3 font-black text-xs outline-none focus:ring-4 ring-yellow-400" />
                     
-                    {folderSelectionUI}
+                    <div className="space-y-1">
+                      <label className="text-[9px] font-black uppercase opacity-60">Collection / Series</label>
+                      {folderSelectionUI}
+                    </div>
 
                     <input type="text" placeholder="TAGS (COMMA SEPARATED)" value={newTags} onChange={(e) => setNewTags(e.target.value)} className="w-full border-2 border-black p-3 font-black text-[10px] outline-none focus:ring-4 ring-yellow-400" />
                     <textarea placeholder="ARTIST NOTE" value={newDesc} onChange={(e) => setNewDesc(e.target.value)} className="w-full border-2 border-black p-3 h-24 font-bold text-[10px] outline-none focus:ring-4 ring-yellow-400" />
@@ -419,15 +422,15 @@ const AdminPortal: React.FC<AdminPortalProps> = ({
               </form>
             ) : (
               <div className="space-y-6">
-                <div className="bg-slate-50 border-2 border-black p-6 space-y-4">
+                <div className="bg-slate-50 border-2 border-black p-6 space-y-6">
                   <h3 className="text-xs font-black uppercase tracking-widest border-b border-black pb-2">Batch Settings</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div className="space-y-1">
-                      <label className="text-[9px] font-black uppercase opacity-60">Target Series</label>
+                      <label className="text-[9px] font-black uppercase opacity-60">Target Collection / Series</label>
                       {folderSelectionUI}
                     </div>
                     <div className="space-y-1">
-                      <label className="text-[9px] font-black uppercase opacity-60">Common Tags</label>
+                      <label className="text-[9px] font-black uppercase opacity-60">Batch Tags (Optional)</label>
                       <input type="text" placeholder="TAGS (COMMA SEPARATED)" value={newTags} onChange={(e) => setNewTags(e.target.value)} className="w-full border-2 border-black p-3 font-black text-[10px] outline-none focus:ring-4 ring-yellow-400" />
                     </div>
                   </div>
@@ -438,7 +441,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({
                   <button onClick={() => bulkInputRef.current?.click()} className="bg-white border-2 border-black px-8 py-4 font-black uppercase text-xs shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
                     {bulkFiles.length > 0 ? `${bulkFiles.length} FILES READY` : 'SELECT IMAGES'}
                   </button>
-                  {bulkFiles.length > 0 && <button onClick={handleBulkUpload} className="block w-full mt-6 bg-blue-600 text-white border-2 border-black py-4 font-black uppercase text-xs">Start Mass Upload</button>}
+                  {bulkFiles.length > 0 && <button onClick={handleBulkUpload} className="block w-full mt-6 bg-blue-600 text-white border-2 border-black py-4 font-black uppercase text-xs">Start Mass Upload to Collection</button>}
                 </div>
               </div>
             )}
@@ -448,7 +451,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({
         <aside className="lg:w-80 space-y-6">
           <div className="bg-yellow-400 border-2 border-black p-4 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] tilt-sm">
             <h3 className="comic-title text-xl uppercase mb-1">Hybrid Upload</h3>
-            <p className="text-[9px] font-black leading-tight uppercase italic opacity-80">PDFs now keep their original file while generating high-res sRGB snapshots for the gallery! 🎨</p>
+            <p className="text-[9px] font-black leading-tight uppercase italic opacity-80">PDFs now keep their original file while generating high-res snapshots! 🎨</p>
           </div>
 
           <div className="bg-white border-2 border-black p-4 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] h-[300px] flex flex-col">
