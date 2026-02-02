@@ -77,8 +77,6 @@ const AdminPortal: React.FC<AdminPortalProps> = ({
       canvas.width = viewport.width;
 
       // CRITICAL COLOR FIX: Fill with white first.
-      // Many comic PDFs have transparent backgrounds. Without this, they blend with 
-      // the canvas default (black), making your colors look dull or "off".
       context.fillStyle = '#FFFFFF';
       context.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -115,7 +113,6 @@ const AdminPortal: React.FC<AdminPortalProps> = ({
           return; 
         }
         
-        // Ensure white background for images as well (e.g. transparent PNGs)
         ctx.fillStyle = '#FFFFFF';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         
@@ -141,6 +138,7 @@ const AdminPortal: React.FC<AdminPortalProps> = ({
     setSelectedFolder(comic.folderid || '');
     setPreviewUrl(comic.thumbnailurl || comic.imageurl);
     setFileObject(null);
+    setIsCreatingNewFolder(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -152,6 +150,8 @@ const AdminPortal: React.FC<AdminPortalProps> = ({
     setPreviewUrl(null);
     setFileObject(null);
     setSelectedFolder('');
+    setIsCreatingNewFolder(false);
+    setNewFolderName('');
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -335,12 +335,52 @@ const AdminPortal: React.FC<AdminPortalProps> = ({
                   </div>
                   <div className="space-y-4">
                     <input type="text" placeholder="TITLE" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} className="w-full border-2 border-black p-3 font-black text-xs outline-none focus:ring-4 ring-yellow-400" />
-                    <select value={selectedFolder} onChange={(e) => setSelectedFolder(e.target.value)} className="w-full border-2 border-black p-3 font-black text-[10px] uppercase">
-                      <option value="">Standalone</option>
-                      {folders.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
-                    </select>
-                    <input type="text" placeholder="TAGS (COMMA SEPARATED)" value={newTags} onChange={(e) => setNewTags(e.target.value)} className="w-full border-2 border-black p-3 font-black text-[10px] outline-none" />
-                    <textarea placeholder="ARTIST NOTE" value={newDesc} onChange={(e) => setNewDesc(e.target.value)} className="w-full border-2 border-black p-3 h-24 font-bold text-[10px] outline-none" />
+                    
+                    {/* Series Selection Area */}
+                    <div className="space-y-2">
+                      <div className="flex gap-2">
+                        {!isCreatingNewFolder ? (
+                          <>
+                            <select 
+                              value={selectedFolder} 
+                              onChange={(e) => setSelectedFolder(e.target.value)} 
+                              className="flex-grow border-2 border-black p-3 font-black text-[10px] uppercase outline-none focus:ring-4 ring-yellow-400"
+                            >
+                              <option value="">Standalone</option>
+                              {folders.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+                            </select>
+                            <button 
+                              type="button" 
+                              onClick={() => setIsCreatingNewFolder(true)}
+                              className="bg-white border-2 border-black px-4 font-black text-[10px] uppercase hover:bg-yellow-400 transition-colors shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:shadow-none"
+                            >
+                              New
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <input 
+                              type="text" 
+                              placeholder="NEW SERIES NAME" 
+                              value={newFolderName} 
+                              onChange={(e) => setNewFolderName(e.target.value)} 
+                              className="flex-grow border-2 border-black p-3 font-black text-[10px] uppercase outline-none focus:ring-4 ring-yellow-400"
+                              autoFocus
+                            />
+                            <button 
+                              type="button" 
+                              onClick={() => {setIsCreatingNewFolder(false); setNewFolderName('');}}
+                              className="bg-white border-2 border-black px-4 font-black text-[10px] uppercase hover:bg-red-400 hover:text-white transition-colors shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:shadow-none"
+                            >
+                              Cancel
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    <input type="text" placeholder="TAGS (COMMA SEPARATED)" value={newTags} onChange={(e) => setNewTags(e.target.value)} className="w-full border-2 border-black p-3 font-black text-[10px] outline-none focus:ring-4 ring-yellow-400" />
+                    <textarea placeholder="ARTIST NOTE" value={newDesc} onChange={(e) => setNewDesc(e.target.value)} className="w-full border-2 border-black p-3 h-24 font-bold text-[10px] outline-none focus:ring-4 ring-yellow-400" />
                   </div>
                 </div>
                 <div className="flex gap-4">
