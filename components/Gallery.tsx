@@ -12,14 +12,15 @@ const GalleryCard: React.FC<{ comic: ComicEntry }> = ({ comic }) => {
   const displayUrl = comic.thumbnailurl || (comic.mimetype.startsWith('image/') ? comic.imageurl : null);
 
   return (
-    <div className="break-inside-avoid mb-6">
+    /* p-3 provides 12px of internal space, ensuring the 10px shadow is never clipped by the column box */
+    <div className="break-inside-avoid mb-4 p-3">
       <Link 
         to={`/comic/${comic.id}`}
         className="group block bg-white border-[3px] border-black p-2 transition-all duration-300 hover:-translate-y-2 hover:shadow-[10px_10px_0px_0px_rgba(0,0,0,1)]"
         title={comic.title}
       >
         <div className="relative flex flex-col h-full overflow-hidden">
-          {/* Dynamic Image Container - No fixed aspect ratio */}
+          {/* Dynamic Image Container */}
           <div className="relative bg-slate-100 flex items-center justify-center overflow-hidden halftone-overlay border-b-[3px] border-black">
             {displayUrl ? (
               <img 
@@ -181,7 +182,8 @@ const Gallery: React.FC<GalleryProps> = ({ comics, folders }) => {
             <h2 className="comic-title text-5xl uppercase italic tracking-tighter">The Void</h2>
           </div>
         ) : (
-          <div className="columns-2 sm:columns-2 md:columns-3 lg:columns-4 xl:columns-5 gap-6 md:gap-8">
+          /* Using -mx-3 to counteract the card's internal padding so the edge items stay aligned with the headers above. */
+          <div className="-mx-3 columns-2 sm:columns-2 md:columns-3 lg:columns-4 xl:columns-5 gap-0 pb-10">
             {filteredComics.map((comic) => (
               <GalleryCard key={comic.id} comic={comic} />
             ))}
