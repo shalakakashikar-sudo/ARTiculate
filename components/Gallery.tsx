@@ -91,8 +91,8 @@ const Gallery: React.FC<GalleryProps> = ({ comics, folders }) => {
 
   return (
     <div className="flex flex-col lg:flex-row gap-10 animate-fadeIn overflow-visible">
-      {/* Sidebar Navigation */}
-      <aside className="lg:w-72 flex-shrink-0 space-y-8">
+      {/* Sidebar Navigation - Made Sticky for stability during scroll */}
+      <aside className="lg:w-72 flex-shrink-0 space-y-8 lg:sticky lg:top-28 lg:self-start lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto lg:pr-2 custom-scrollbar">
         
         <div className="relative">
           <input 
